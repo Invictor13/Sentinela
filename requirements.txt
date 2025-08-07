@@ -1,0 +1,7 @@
+Pillow
+numpy
+opencv-python
+pynput
+pygetwindow
+mss
+pystray
