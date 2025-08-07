@@ -3,7 +3,6 @@ import threading
 import ctypes
 import os
 import sys
-
 from .app.main_window import MainApplication
 from .core.capture import ScreenCaptureModule
 from .core.recording import ScreenRecordingModule
@@ -43,7 +42,6 @@ def main():
 
     capture_module = ScreenCaptureModule(root, save_path)
     recording_module = ScreenRecordingModule(root, save_path)
-
     main_app = MainApplication(root, capture_module, recording_module, app_config)
     main_app.pack(side="top", fill="both", expand=True)
 
