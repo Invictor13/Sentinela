@@ -269,51 +269,6 @@ class ScreenRecordingModule:
         except FileNotFoundError:
             cursor_img = None
         mouse_controller = MouseController()
-
-        try:
-            with mss.mss() as sct:
-                while self.is_recording:
-                    loop_start_time = time.time()
-                    try:
-                        if is_window_recording:
-                            if not target_to_record.visible or target_to_record.isMinimized:
-                                self.is_recording = False
-                                continue
-                            capture_area = {'top': target_to_record.top, 'left': target_to_record.left, 'width': original_width, 'height': original_height}
-                        else:
-                            capture_area = target_to_record
-
-                        sct_img = sct.grab(capture_area)
-                        frame_np = np.array(sct_img)
-
-                        if (original_width, original_height) != (width, height):
-                            frame_np_resized = cv2.resize(frame_np, (width, height), interpolation=cv2.INTER_AREA)
-                        else:
-                            frame_np_resized = frame_np
-
-                        frame_pil = Image.fromarray(cv2.cvtColor(frame_np_resized, cv2.COLOR_BGRA2RGB))
-
-                        if cursor_img:
-                            mouse_pos = mouse_controller.position
-                            cursor_x_in_capture = mouse_pos[0] - capture_area['left']
-                            cursor_y_in_capture = mouse_pos[1] - capture_area['top']
-                            scaled_cursor_x = int(cursor_x_in_capture * (width / original_width))
-                            scaled_cursor_y = int(cursor_y_in_capture * (height / original_height))
-                            frame_pil.paste(cursor_img, (scaled_cursor_x, scaled_cursor_y), cursor_img)
-
-                        self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
-
-                    except Exception as e:
-                        print(f"Erro durante o loop de gravação: {e}")
-                        self.is_recording = False
-
-                    sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-        finally:
-            if self.out:
-                self.out.release()
-
         def finalize_on_main_thread():
             if os.path.exists(filename) and os.path.getsize(filename) > 0:
                 show_success_dialog(self.root, "Gravação salva.", os.path.dirname(filename), filename)
