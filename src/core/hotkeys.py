@@ -2,11 +2,11 @@ from pynput import keyboard
 
 def key_listener_thread_proc(capture_module, recording_module, root_window):
     current_keys = set()
-    CAPTURE_COMBO = {keyboard.Key.shift, keyboard.Key.f9}
-    RECORD_COMBO = {keyboard.Key.shift, keyboard.Key.f10}
+    CAPTURE_COMBO = {keyboard.Key.ctrl, keyboard.Key.shift, keyboard.Key.f9}
+    RECORD_COMBO = {keyboard.Key.ctrl, keyboard.Key.shift, keyboard.Key.f10}
 
     def on_press(key):
-        if key in {keyboard.Key.shift, keyboard.Key.f9, keyboard.Key.f10}:
+        if key in {keyboard.Key.ctrl, keyboard.Key.shift, keyboard.Key.f9, keyboard.Key.f10}:
             current_keys.add(key)
 
         if CAPTURE_COMBO.issubset(current_keys):
