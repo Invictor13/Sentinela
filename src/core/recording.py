@@ -187,13 +187,20 @@ class ScreenRecordingModule:
                         current_x_offset = 0
                         virtual_screen_left = sct.monitors[0]['left']
                         virtual_screen_top = sct.monitors[0]['top']
-                        for monitor in monitors_to_capture:
-                            sct_img = sct.grab(monitor)
-                            frame_np = np.array(sct_img)
-                            h_m, w_m, _ = frame_np.shape
-                            frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
-                            combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
-                            current_x_offset += w_m
+
+                        try:
+                            self.indicator.withdraw()
+                            time.sleep(0.01)
+                            for monitor in monitors_to_capture:
+                                sct_img = sct.grab(monitor)
+                                frame_np = np.array(sct_img)
+                                h_m, w_m, _ = frame_np.shape
+                                frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
+                                combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
+                                current_x_offset += w_m
+                        finally:
+                            self.indicator.deiconify()
+
                         final_frame_pil = Image.fromarray(cv2.cvtColor(combined_frame, cv2.COLOR_BGR2RGB))
                         if cursor_img:
                             mouse_pos = mouse_controller.position
@@ -203,7 +210,14 @@ class ScreenRecordingModule:
                         self.out.write(cv2.cvtColor(np.array(final_frame_pil), cv2.COLOR_RGB2BGR))
                     else:
                         capture_area = target_to_record
-                        sct_img = sct.grab(capture_area)
+
+                        try:
+                            self.indicator.withdraw()
+                            time.sleep(0.01)
+                            sct_img = sct.grab(capture_area)
+                        finally:
+                            self.indicator.deiconify()
+
                         frame_np = np.array(sct_img)
                         original_width, original_height = target_to_record['width'], target_to_record['height']
                         if (original_width, original_height) != (width, height):
@@ -221,6 +235,8 @@ class ScreenRecordingModule:
                         self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
                 except Exception as e:
                     print(f"Erro durante o loop de gravação: {e}")
+                    if self.indicator:
+                        self.indicator.deiconify()
                     self.state = "idle"
                 sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
                 if sleep_time > 0: time.sleep(sleep_time)

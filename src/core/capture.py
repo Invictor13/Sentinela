@@ -76,15 +76,15 @@ class ScreenCaptureModule:
 
         # 2. Capture-phase widgets
         self.end_button = tk.Button(
-            self.main_frame, text="CONCLUIR SESSÃO", command=self.end_capture_session,
+            self.main_frame, text="CONCLUIR", command=self.end_capture_session,
             bg="red", fg="white", font=(font_family, 10, "bold"), relief="flat", padx=10
         )
         self.esc_hint_label = tk.Label(
-            self.main_frame, text="(ou pressione ESC)",
+            self.main_frame, text="ou pressione ESC para encerrar",
             bg=bg_color, fg=fg_color, font=(font_family, 9)
         )
         self.counter_label = tk.Label(
-            self.main_frame, text="Capturas: 0",
+            self.main_frame, text="Total de Capturas: 0",
             bg=bg_color, fg=fg_color, font=(font_family, 12)
         )
 
@@ -172,7 +172,7 @@ class ScreenCaptureModule:
 
             # Update UI counter
             if self.counter_label:
-                self.counter_label.config(text=f"Capturas: {len(self.screenshots)}")
+                self.counter_label.config(text=f"Total de Capturas: {len(self.screenshots)}")
 
             # Flash indicator for visual feedback
             if self.overlay_manager and self.overlay_manager.indicator:
