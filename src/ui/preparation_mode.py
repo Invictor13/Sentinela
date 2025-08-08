@@ -135,9 +135,22 @@ class PreparationOverlayManager:
         image_item = canvas.create_image(0, 0, anchor="nw")
 
         try:
-            logo_image = Image.open(self.logo_path).resize((120, 120), Image.Resampling.LANCZOS)
-            logo_tk = ImageTk.PhotoImage(logo_image)
-            canvas.create_image(w/2, h/2 - 50, image=logo_tk)
+            # --- Enhanced Logo Resizing ---
+            logo_original = Image.open(self.logo_path)
+            original_width, original_height = logo_original.size
+
+            # Calculate new height to be 20% of the monitor's height
+            target_height = int(h * 0.20)
+
+            # Maintain aspect ratio
+            aspect_ratio = original_width / original_height
+            target_width = int(target_height * aspect_ratio)
+
+            # Resize with high-quality downsampling
+            logo_resized = logo_original.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+            logo_tk = ImageTk.PhotoImage(logo_resized)
+            canvas.create_image(w/2, h/2 - (target_height / 2), image=logo_tk) # Adjust vertical position based on new size
             canvas.logo_ref = logo_tk
         except Exception as e:
             print(f"Could not load logo for overlay: {e}")

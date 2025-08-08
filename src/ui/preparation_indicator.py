@@ -33,6 +33,28 @@ class PreparationIndicator(Toplevel):
     def hide_preparation_mode(self):
         self.withdraw()
 
+    def flash_success(self):
+        """Flashes the indicator green to show a successful capture."""
+        if not self.winfo_exists():
+            return
+
+        original_bg = self.container.cget('bg')
+        original_prep_fg = self.container.winfo_children()[0].cget('fg') # Assuming first child is the "● Preparando" label
+
+        self.container.configure(bg='green')
+        for widget in self.container.winfo_children():
+            widget.configure(bg='green')
+
+        def restore_colors():
+            if self.winfo_exists():
+                self.container.configure(bg=original_bg)
+                # Restore original colors of all children
+                self.container.winfo_children()[0].configure(fg=original_prep_fg, bg=original_bg)
+                for child in self.container.winfo_children()[1:]:
+                    child.configure(bg=original_bg)
+
+        self.after(150, restore_colors)
+
     def _display_window(self, monitor_geom):
         if not monitor_geom: return
         self.update_idletasks()
