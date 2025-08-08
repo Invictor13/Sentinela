@@ -19,6 +19,174 @@ COR_CARD = "#ffffff"
 COR_TEXTO_PRINCIPAL = "#005a36"
 COR_TEXTO_SECUNDARIO = "#555555"
 COR_BOTAO = "#00995D"
+COR_DESTAQUE = "#00b37a"
+COR_TRANSPARENTE = "white"
+
+
+class OverlaySelectionWindow(Toplevel):
+    def __init__(self, parent, recorder_module):
+        super().__init__(parent)
+        self.recorder_module = recorder_module
+        self.sct = mss.mss()
+
+        # Configurações da janela de sobreposição
+        self.configure(bg=COR_TRANSPARENTE)
+        self.wm_attributes("-transparentcolor", COR_TRANSPARENTE)
+        self.wm_attributes("-topmost", True)
+        self.overrideredirect(True)
+
+        # Obter a geometria de todo o desktop virtual
+        total_width = sum(m["width"] for m in self.sct.monitors[1:])
+        min_left = min(m["left"] for m in self.sct.monitors[1:])
+        min_top = min(m["top"] for m in self.sct.monitors[1:])
+        max_height = max(m["height"] for m in self.sct.monitors[1:])
+
+        # A geometria para cobrir tudo pode ser complexa; vamos usar o monitor[0] por enquanto
+        # que geralmente representa o desktop virtual inteiro.
+        desktop = self.sct.monitors[0]
+        self.geometry(f"{desktop['width']}x{desktop['height']}+{desktop['left']}+{desktop['top']}")
+
+        # Canvas para escurecer a tela
+        self.canvas = tk.Canvas(self, bg="#000000", highlightthickness=0)
+        self.wm_attributes("-alpha", 0.5) # Opacidade da janela inteira
+        self.canvas.pack(fill="both", expand=True)
+
+        self.available_windows = []
+        self.active_window = None
+        self.highlight_rect = None
+
+        self.desktop_offset_x = desktop['left']
+        self.desktop_offset_y = desktop['top']
+
+        self.refresh_window_list()
+        self.canvas.bind("<Motion>", self.on_mouse_move)
+        self.canvas.bind("<Button-1>", self.on_mouse_click)
+
+        # Estado da seleção
+        self.selection_locked = False
+        self.selected_window = None
+        self.quality_var = tk.StringVar(value="high")
+        self.buttons = {}
+
+
+    def refresh_window_list(self):
+        self.available_windows = []
+        seen_titles = set()
+        # Nomes de janelas a serem ignoradas
+        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", self.title()}
+
+        all_windows = gw.getAllWindows()
+        for window in all_windows:
+            if (window.title and
+                window.visible and
+                not window.isMinimized and
+                window.width > 100 and # Filtrar janelas muito pequenas
+                window.height > 100 and
+                window.title not in seen_titles and
+                window.title not in banned_titles):
+                self.available_windows.append(window)
+                seen_titles.add(window.title)
+
+    def on_mouse_move(self, event):
+        # Coordenadas do mouse relativas à tela
+        mouse_x, mouse_y = self.winfo_pointerxy()
+
+        found_window = None
+        for window in self.available_windows:
+            if (window.left < mouse_x < window.right and
+                window.top < mouse_y < window.bottom):
+                found_window = window
+                break
+
+        if found_window and found_window != self.active_window:
+            self.active_window = found_window
+            if self.highlight_rect:
+                self.canvas.delete(self.highlight_rect)
+
+            # Ajustar coordenadas para o canvas
+            x1 = window.left - self.desktop_offset_x
+            y1 = window.top - self.desktop_offset_y
+            x2 = window.right - self.desktop_offset_x
+            y2 = window.bottom - self.desktop_offset_y
+
+            self.highlight_rect = self.canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline=COR_DESTAQUE, width=4, fill=COR_TRANSPARENTE
+            )
+        elif not found_window and self.active_window:
+            self.active_window = None
+            if self.highlight_rect:
+                self.canvas.delete(self.highlight_rect)
+                self.highlight_rect = None
+
+    def on_mouse_click(self, event):
+        if self.selection_locked:
+            # A seleção está travada, verificar clique nos botões
+            mouse_x, mouse_y = event.x, event.y
+            for name, (x1, y1, x2, y2) in self.buttons.items():
+                if x1 < mouse_x < x2 and y1 < mouse_y < y2:
+                    if name == "record":
+                        self.recorder_module.start_recording_mode(self.selected_window, self.quality_var.get())
+                        self.destroy()
+                    elif name == "cancel":
+                        self.destroy()
+                    break
+        elif self.active_window:
+            # Travar a seleção na janela ativa
+            self.selection_locked = True
+            self.selected_window = self.active_window
+            self.canvas.unbind("<Motion>")
+            self._draw_confirmation_controls()
+
+    def _draw_confirmation_controls(self):
+        # Coordenadas da janela selecionada, ajustadas para o canvas
+        win_x1 = self.selected_window.left - self.desktop_offset_x
+        win_y1 = self.selected_window.top - self.desktop_offset_y
+        win_x2 = self.selected_window.right - self.desktop_offset_x
+        win_y2 = self.selected_window.bottom - self.desktop_offset_y
+
+        # Posição para os controles (abaixo da janela selecionada)
+        controls_y = win_y2 + 10
+        center_x = (win_x1 + win_x2) / 2
+
+        # --- Botão Gravar (desenhado manualmente) ---
+        btn_w, btn_h = 100, 30
+        rec_x1 = center_x - btn_w - 5
+        rec_y1 = controls_y
+        rec_x2 = rec_x1 + btn_w
+        rec_y2 = rec_y1 + btn_h
+        self.canvas.create_rectangle(rec_x1, rec_y1, rec_x2, rec_y2, fill=COR_BOTAO, outline=COR_BOTAO, tags="controls")
+        self.canvas.create_text(rec_x1 + btn_w/2, rec_y1 + btn_h/2, text="Gravar", fill="white", font=("Segoe UI", 10, "bold"), tags="controls")
+        self.buttons["record"] = (rec_x1, rec_y1, rec_x2, rec_y2)
+
+        # --- Botão Cancelar (desenhado manualmente) ---
+        can_x1 = center_x + 5
+        can_y1 = controls_y
+        can_x2 = can_x1 + btn_w
+        can_y2 = can_y1 + btn_h
+        self.canvas.create_rectangle(can_x1, can_y1, can_x2, can_y2, fill="#a9a9a9", outline="#a9a9a9", tags="controls")
+        self.canvas.create_text(can_x1 + btn_w/2, can_y1 + btn_h/2, text="Cancelar", fill="white", font=("Segoe UI", 10, "bold"), tags="controls")
+        self.buttons["cancel"] = (can_x1, can_y1, can_x2, can_y2)
+
+        # --- Opções de Qualidade (Radio Buttons) ---
+        quality_frame = tk.Frame(self, bg="#333333")
+        style = ttk.Style()
+        style.configure("TFrame", background="#333333")
+        style.configure("TRadiobutton", background="#333333", foreground="white", font=("Segoe UI", 9))
+
+        rb_high = ttk.Radiobutton(quality_frame, text="Alta Qualidade", variable=self.quality_var, value="high", style="TRadiobutton")
+        rb_compact = ttk.Radiobutton(quality_frame, text="Compacta", variable=self.quality_var, value="compact", style="TRadiobutton")
+        rb_high.pack(side="left", padx=5)
+        rb_compact.pack(side="left", padx=5)
+
+        self.canvas.create_window(center_x, controls_y + btn_h + 20, window=quality_frame, tags="controls")
+
+    def destroy(self):
+        # Garantir que a janela principal reapareça
+        if self.recorder_module:
+            self.recorder_module.root.deiconify()
+        super().destroy()
+
 
 class ScreenRecordingModule:
     def __init__(self, root, save_path):
@@ -28,10 +196,6 @@ class ScreenRecordingModule:
         self.out = None
         self.start_time = None
         self.selection_window = None
-        self.selected_area = None
-        self.selected_window_obj = None
-        self.start_button = None
-        self.preview_photo = None
         self.recording_indicator = RecordingIndicator(self.root, self)
         self.sct = mss.mss()
         self.thread_gravacao = None
@@ -39,161 +203,22 @@ class ScreenRecordingModule:
     def open_recording_selection_ui(self):
         if self.is_recording or (self.selection_window and self.selection_window.winfo_exists()):
             return
+
         self.root.withdraw()
-        self.selection_window = Toplevel(self.root)
-        self.selection_window.title("Opção de Gravação")
-        self.selection_window.configure(bg=COR_FUNDO_JANELA)
-        self.selection_window.resizable(False, False)
-        self.selection_window.wm_attributes("-topmost", True)
-
-        main_frame = tk.Frame(self.selection_window, bg=COR_FUNDO_JANELA, padx=10, pady=10)
-        main_frame.pack(fill="both", expand=True)
-
-        left_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
-        left_frame.pack(side="left", fill="y", padx=(0, 10))
-
-        right_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
-        right_frame.pack(side="left", fill="both", expand=True)
-
-        tk.Label(left_frame, text="1. Selecione a Fonte", font=("Segoe UI", 12, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).pack(anchor="w", pady=(0, 10))
-        self.monitor_var = tk.StringVar()
-        monitor_options = ["Gravar Todos os Monitores"] + [f"Monitor {i}: {m['width']}x{m['height']}" for i, m in enumerate(self.sct.monitors[1:], 1)]
-        self.monitor_combo = ttk.Combobox(left_frame, textvariable=self.monitor_var, values=monitor_options, state="readonly", width=35)
-        self.monitor_combo.pack(fill='x', pady=5)
-        self.monitor_combo.bind("<<ComboboxSelected>>", self.on_monitor_select)
-        tk.Label(left_frame, text="Ou selecione uma janela:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).pack(pady=(10, 5), anchor='w')
-        self.window_listbox = Listbox(left_frame, selectmode=SINGLE, bg=COR_CARD, fg=COR_TEXTO_SECUNDARIO, selectbackground=COR_BOTAO, font=("Segoe UI", 9), height=10)
-        self.window_listbox.pack(expand=True, fill="both")
-        self.window_listbox.bind("<<ListboxSelect>>", self.on_window_select)
-        refresh_button = tk.Button(left_frame, text="Atualizar Lista", command=self.refresh_window_list, font=("Segoe UI", 9), relief=tk.FLAT)
-        refresh_button.pack(pady=(5,0), fill='x')
-        self.refresh_window_list()
-
-        tk.Label(right_frame, text="2. Escolha a Qualidade", font=("Segoe UI", 12, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).pack(anchor="w", pady=(0, 10))
-
-        self.quality_var = tk.StringVar(value="high")
-
-        quality_options = {
-            "high": ("Alta Qualidade (Textos Nítidos)", "Grava em até 1080p. Ideal para sistemas e documentos. Arquivos maiores."),
-            "compact": ("Compacta (Web e E-mail)", "Grava em até 720p. Ideal para compartilhamento. Arquivos menores.")
-        }
-
-        for value, (text, desc) in quality_options.items():
-            rb_frame = tk.Frame(right_frame, bg=COR_FUNDO_JANELA)
-            rb_frame.pack(fill="x", pady=2)
-            rb = ttk.Radiobutton(rb_frame, text=text, variable=self.quality_var, value=value)
-            rb.pack(side="left", anchor="w")
-            tk.Label(rb_frame, text=desc, font=("Segoe UI", 8), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).pack(side="left", anchor="w", padx=5)
-
-        tk.Label(right_frame, text="3. Pré-visualização", font=("Segoe UI", 12, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).pack(anchor="w", pady=(15, 5))
-        preview_container = tk.Frame(right_frame, bg="black", width=480, height=270)
-        preview_container.pack(); preview_container.pack_propagate(False)
-        self.preview_label = tk.Label(preview_container, bg="black", text="Selecione uma fonte para ver a prévia", fg="white", font=("Segoe UI", 10))
-        self.preview_label.pack(expand=True, fill="both")
-
-        control_frame = tk.Frame(self.selection_window, bg=COR_FUNDO_JANELA, pady=10, padx=10)
-        control_frame.pack(fill="x")
-        self.start_button = tk.Button(control_frame, text="Iniciar Gravação", command=self.start_recording_from_preview, font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, state=tk.DISABLED)
-        self.start_button.pack(side="right")
-        cancel_button = tk.Button(control_frame, text="Cancelar", command=self.close_selection_window, font=("Segoe UI", 10), relief=tk.FLAT)
-        cancel_button.pack(side="right", padx=10)
-
-        self.selection_window.protocol("WM_DELETE_WINDOW", self.close_selection_window)
-        self.selection_window.lift(); self.selection_window.focus_force()
-
-    def refresh_window_list(self):
-        self.window_listbox.delete(0, END)
-        self.available_windows = []
-        seen_titles = set()
-
-        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", "Opção de Gravação"}
-
-        all_windows = gw.getAllWindows()
-        for window in all_windows:
-            if (window.title and
-                window.visible and
-                not window.isMinimized and
-                window.width > 10 and
-                window.height > 10 and
-                window.title not in seen_titles and
-                window.title not in banned_titles):
-
-                self.available_windows.append(window)
-                self.window_listbox.insert(END, window.title)
-                seen_titles.add(window.title)
-
-    def on_monitor_select(self, event):
-        self.window_listbox.selection_clear(0, END)
-        selected_index = self.monitor_combo.current()
-        self.selected_window_obj = None
-        self.start_button.config(state=tk.DISABLED)
-        if selected_index == 0:
-            self.selected_area = self.sct.monitors[0]
-        else:
-            self.selected_area = self.sct.monitors[selected_index]
-        self.update_static_preview()
-
-    def on_window_select(self, event):
-        try:
-            self.monitor_var.set('')
-            selected_index = self.window_listbox.curselection()[0]
-            selected_title = self.window_listbox.get(selected_index)
-            self.start_button.config(state=tk.DISABLED)
-
-            target_window = next((w for w in self.available_windows if w.title == selected_title), None)
-            if target_window:
-                self.selected_window_obj = target_window
-                self.selected_area = {"top": target_window.top, "left": target_window.left, "width": target_window.width, "height": target_window.height}
-                self.update_static_preview()
-        except IndexError:
-            pass
-
-    def update_static_preview(self):
-        if not self.selection_window or not self.selection_window.winfo_exists() or not self.selected_area:
-            return
-        original_geometry, sct_img = None, None
-        try:
-            original_geometry = self.selection_window.geometry()
-            self.selection_window.geometry("+3000+3000")
-            self.root.update_idletasks()
-            time.sleep(0.1)
-            sct_img = self.sct.grab(self.selected_area)
-        except Exception as e:
-            print(f"Erro na pré-visualização: {e}")
-        finally:
-            if original_geometry and self.selection_window and self.selection_window.winfo_exists():
-                self.selection_window.geometry(original_geometry)
-        if sct_img:
-            try:
-                img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-                img_resized = img.resize((480, 270), Image.Resampling.LANCZOS)
-                self.preview_photo = ImageTk.PhotoImage(image=img_resized)
-                self.preview_label.config(image=self.preview_photo, text="")
-                self.start_button.config(state=tk.NORMAL)
-            except Exception as e:
-                print(f"Erro ao processar pré-visualização: {e}")
-
-    def start_recording_from_preview(self):
-        if not self.selected_area:
-            return
-        target_to_record = self.selected_window_obj or self.selected_area
-        quality_profile = self.quality_var.get()
-        if self.selected_window_obj:
-            try:
-                self.selected_window_obj.activate()
-                time.sleep(0.3)
-            except Exception as e:
-                print(f"Falha ao ativar janela: {e}")
-        self.close_selection_window()
-        self.start_recording_mode(target_to_record, quality_profile)
-
-    def close_selection_window(self):
-        if self.selection_window:
-            self.selection_window.destroy()
-            self.selection_window = None
-        self.root.deiconify()
+        self.selection_window = OverlaySelectionWindow(self.root, self)
 
     def start_recording_mode(self, target_to_record, quality_profile):
+        # Adicionar uma pequena pausa para a janela de overlay fechar
+        time.sleep(0.2)
+
+        # Ativar a janela alvo para garantir que ela esteja em primeiro plano
+        if hasattr(target_to_record, 'title'):
+            try:
+                target_to_record.activate()
+                time.sleep(0.3) # Pausa para a ativação da janela
+            except Exception as e:
+                print(f"Falha ao ativar a janela selecionada: {e}")
+
         if self.is_recording:
             return
         self.is_recording = True
