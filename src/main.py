@@ -28,6 +28,15 @@ def main():
             print(f"Alerta de DPI: Não foi possível configurar a sensibilidade de DPI. Erro: {e}")
 
     root = tk.Tk()
+    root.attributes('-fullscreen', True)
+
+    # Função para sair da tela cheia
+    def exit_fullscreen(event=None):
+        root.attributes('-fullscreen', False)
+
+    # Vinculando a tecla Escape a esta função
+    root.bind('<Escape>', exit_fullscreen)
+
     root.title("Sentinela Unimed")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
     root.geometry("1280x720")

@@ -28,6 +28,8 @@ class ScreenCaptureModule:
 
         # Session UI
         self.session_ui = None
+        self.main_frame = None
+        self.instruction_label = None
         self.counter_label = None
 
     def start_capture_session(self):
@@ -41,7 +43,7 @@ class ScreenCaptureModule:
             self.root,
             self.indicator,
             indicator_text="Pressione F9 para capturar a tela ativa",
-            inactive_text="Esta tela não será capturada"
+            inactive_text="ESTA TELA NÃO ESTÁ SENDO GRAVADA..."
         )
         self.overlay_manager.start()
         self._create_session_ui()
@@ -63,31 +65,18 @@ class ScreenCaptureModule:
         font_family = "Segoe UI"
 
         # Main frame
-        main_frame = tk.Frame(self.session_ui, bg=bg_color)
-        main_frame.pack(fill="both", expand=True)
+        self.main_frame = tk.Frame(self.session_ui, bg=bg_color)
+        self.main_frame.pack(fill="both", expand=True)
 
-        # Counter Label
-        self.counter_label = tk.Label(
-            main_frame,
-            text="Capturas: 0",
+        # Initial Instruction Label
+        self.instruction_label = tk.Label(
+            self.main_frame,
+            text="Mire na tela e pressione F9 para capturar. Pressione ESC para sair.",
             bg=bg_color,
             fg=fg_color,
             font=(font_family, 12)
         )
-        self.counter_label.pack(side="left", padx=10, pady=5)
-
-        # End Session Button
-        end_button = tk.Button(
-            main_frame,
-            text="Concluir & Salvar",
-            command=self.end_capture_session,
-            bg="#61afef",
-            fg="white",
-            font=(font_family, 10, "bold"),
-            relief="flat",
-            padx=10
-        )
-        end_button.pack(side="right", padx=10, pady=5)
+        self.instruction_label.pack(padx=10, pady=10)
 
         # Positioning the UI at the bottom-center of the active monitor
         self.session_ui.update_idletasks()
@@ -95,6 +84,51 @@ class ScreenCaptureModule:
         x_pos = active_monitor['left'] + (active_monitor['width'] - ui_width) // 2
         y_pos = active_monitor['top'] + active_monitor['height'] - self.session_ui.winfo_height() - 20 # 20px offset from bottom
         self.session_ui.geometry(f"+{x_pos}+{y_pos}")
+
+    def _activate_capture_controls(self):
+        # Hide instruction
+        self.instruction_label.pack_forget()
+
+        # Style
+        bg_color = "#282c34"
+        fg_color = "white"
+        font_family = "Segoe UI"
+
+        # To align items correctly, pack right-aligned items first
+
+        # End Session Button
+        end_button = tk.Button(
+            self.main_frame,
+            text="CONCLUIR SESSÃO",
+            command=self.end_capture_session,
+            bg="red",
+            fg="white",
+            font=(font_family, 10, "bold"),
+            relief="flat",
+            padx=10
+        )
+        end_button.pack(side="right", padx=(0, 10), pady=5)
+
+        # ESC Hint Label
+        esc_hint = tk.Label(
+            self.main_frame,
+            text="(ou pressione ESC)",
+            bg=bg_color,
+            fg=fg_color,
+            font=(font_family, 9)
+        )
+        esc_hint.pack(side="right", padx=(0, 5))
+
+        # Counter Label
+        self.counter_label = tk.Label(
+            self.main_frame,
+            text="Capturas: 1",
+            bg=bg_color,
+            fg=fg_color,
+            font=(font_family, 12)
+        )
+        self.counter_label.pack(side="left", padx=10, pady=5)
+
 
     def end_capture_session(self):
         if not self.is_in_session:
@@ -150,6 +184,9 @@ class ScreenCaptureModule:
                 img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
 
             self.screenshots.append(img)
+
+            if len(self.screenshots) == 1:
+                self._activate_capture_controls()
 
             # Update UI counter
             if self.counter_label:
