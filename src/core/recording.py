@@ -40,12 +40,14 @@ class ScreenRecordingModule:
 
     # --- MODIFIED: enter_preparation_mode ---
     def enter_preparation_mode(self, record_all_screens=False):
+        print(f"[RUNA DE DEPURAÇÃO] Modo de Preparação iniciado com record_all_screens = {record_all_screens}")
+        self.should_record_all_screens = record_all_screens # Armazena o estado na instância
         if self.state != "idle":
             return
 
         if record_all_screens:
             # Bypassa o modo de preparação e inicia a gravação diretamente
-            self.start_recording_mode(record_all_screens=True)
+            self.start_recording_mode()
             return
 
         self.state = "preparing"
@@ -208,7 +210,7 @@ class ScreenRecordingModule:
         self.recording_indicator.hide_preparation_mode()
 
     # --- MODIFIED: start_recording_mode ---
-    def start_recording_mode(self, quality_profile="high", record_all_screens=False):
+    def start_recording_mode(self, quality_profile="high"):
         if self.state == "preparing":
             self._destroy_preparation_overlays()
         elif self.state != "idle":
@@ -218,8 +220,9 @@ class ScreenRecordingModule:
         self.root.withdraw() # Garante que a janela principal esteja oculta
         time.sleep(0.2)
 
-        target_monitor = self.active_monitor_for_recording if not record_all_screens else None
-        self.thread_gravacao = threading.Thread(target=self.recording_thread, args=(target_monitor, quality_profile, record_all_screens), daemon=True)
+        target_monitor = self.active_monitor_for_recording if not self.should_record_all_screens else None
+        # O último argumento para o thread é removido, já que o thread usará o atributo da classe
+        self.thread_gravacao = threading.Thread(target=self.recording_thread, args=(target_monitor, quality_profile), daemon=True)
         self.thread_gravacao.start()
 
         self.recording_indicator.show()
@@ -237,7 +240,7 @@ class ScreenRecordingModule:
             self._destroy_preparation_overlays()
             self.root.deiconify()
 
-    def recording_thread(self, target_to_record, quality_profile, record_all_screens=False):
+    def recording_thread(self, target_to_record, quality_profile):
         config = configparser.ConfigParser()
         config.read(CONFIG_FILE)
         quality_profile = config.get('Recording', 'quality', fallback='high')
@@ -251,7 +254,8 @@ class ScreenRecordingModule:
 
         mouse_controller = MouseController()
 
-        if record_all_screens:
+        if self.should_record_all_screens:
+            print("[RUNA DE DEPURAÇÃO] Forja ativada em modo Onipresente (todas as telas).")
             monitors = self.sct.monitors[1:]
             total_width = sum(m['width'] for m in monitors)
             max_height = max(m['height'] for m in monitors)
@@ -302,7 +306,7 @@ class ScreenRecordingModule:
             while self.is_recording:
                 loop_start_time = time.time()
                 try:
-                    if record_all_screens:
+                    if self.should_record_all_screens:
                         monitors_to_capture = sct.monitors[1:]
                         combined_frame = np.zeros((height, width, 3), dtype=np.uint8)
                         current_x_offset = 0
@@ -333,6 +337,7 @@ class ScreenRecordingModule:
                         self.out.write(cv2.cvtColor(np.array(final_frame_pil), cv2.COLOR_RGB2BGR))
 
                     else:  # Lógica original para uma única tela
+                        print("[RUNA DE DEPURAÇÃO] Forja ativada em modo Focado (uma tela).")
                         capture_area = target_to_record
                         sct_img = sct.grab(capture_area)
                         frame_np = np.array(sct_img)
