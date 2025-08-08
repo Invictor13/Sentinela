@@ -31,6 +31,8 @@ class ScreenCaptureModule:
         self.main_frame = None
         self.instruction_label = None
         self.counter_label = None
+        self.end_button = None
+        self.esc_hint_label = None
 
     def start_capture_session(self):
         if self.is_in_session:
@@ -51,7 +53,6 @@ class ScreenCaptureModule:
     def _create_session_ui(self):
         active_monitor = self.overlay_manager.get_active_monitor()
         if not active_monitor:
-            # Fallback or log error if no active monitor found
             return
 
         self.session_ui = tk.Toplevel(self.root)
@@ -59,74 +60,53 @@ class ScreenCaptureModule:
         self.session_ui.wm_attributes("-topmost", True)
         self.session_ui.wm_attributes("-alpha", 0.9)
 
-        # Style
-        bg_color = "#282c34"
-        fg_color = "white"
-        font_family = "Segoe UI"
+        bg_color, fg_color, font_family = "#282c34", "white", "Segoe UI"
 
-        # Main frame
         self.main_frame = tk.Frame(self.session_ui, bg=bg_color)
         self.main_frame.pack(fill="both", expand=True)
 
-        # Initial Instruction Label
+        # --- Create all widgets upfront ---
+
+        # 1. Preparation-phase widget
         self.instruction_label = tk.Label(
             self.main_frame,
             text="Mire na tela e pressione F9 para capturar. Pressione ESC para sair.",
-            bg=bg_color,
-            fg=fg_color,
-            font=(font_family, 12)
+            bg=bg_color, fg=fg_color, font=(font_family, 12)
         )
+
+        # 2. Capture-phase widgets
+        self.end_button = tk.Button(
+            self.main_frame, text="CONCLUIR SESSÃO", command=self.end_capture_session,
+            bg="red", fg="white", font=(font_family, 10, "bold"), relief="flat", padx=10
+        )
+        self.esc_hint_label = tk.Label(
+            self.main_frame, text="(ou pressione ESC)",
+            bg=bg_color, fg=fg_color, font=(font_family, 9)
+        )
+        self.counter_label = tk.Label(
+            self.main_frame, text="Capturas: 0",
+            bg=bg_color, fg=fg_color, font=(font_family, 12)
+        )
+
+        # --- Initial layout ---
+        # Only show the instruction label initially
         self.instruction_label.pack(padx=10, pady=10)
 
-        # Positioning the UI at the bottom-center of the active monitor
+        # Positioning the UI
         self.session_ui.update_idletasks()
         ui_width = self.session_ui.winfo_width()
         x_pos = active_monitor['left'] + (active_monitor['width'] - ui_width) // 2
-        y_pos = active_monitor['top'] + active_monitor['height'] - self.session_ui.winfo_height() - 20 # 20px offset from bottom
+        y_pos = active_monitor['top'] + active_monitor['height'] - self.session_ui.winfo_height() - 20
         self.session_ui.geometry(f"+{x_pos}+{y_pos}")
 
-    def _activate_capture_controls(self):
-        # Hide instruction
+    def _transition_to_capture_ui(self):
+        """Hides preparation widgets and shows capture-in-progress widgets."""
+        # Hide preparation UI
         self.instruction_label.pack_forget()
 
-        # Style
-        bg_color = "#282c34"
-        fg_color = "white"
-        font_family = "Segoe UI"
-
-        # To align items correctly, pack right-aligned items first
-
-        # End Session Button
-        end_button = tk.Button(
-            self.main_frame,
-            text="CONCLUIR SESSÃO",
-            command=self.end_capture_session,
-            bg="red",
-            fg="white",
-            font=(font_family, 10, "bold"),
-            relief="flat",
-            padx=10
-        )
-        end_button.pack(side="right", padx=(0, 10), pady=5)
-
-        # ESC Hint Label
-        esc_hint = tk.Label(
-            self.main_frame,
-            text="(ou pressione ESC)",
-            bg=bg_color,
-            fg=fg_color,
-            font=(font_family, 9)
-        )
-        esc_hint.pack(side="right", padx=(0, 5))
-
-        # Counter Label
-        self.counter_label = tk.Label(
-            self.main_frame,
-            text="Capturas: 1",
-            bg=bg_color,
-            fg=fg_color,
-            font=(font_family, 12)
-        )
+        # Show capture UI (pack order matters for layout)
+        self.end_button.pack(side="right", padx=(0, 10), pady=5)
+        self.esc_hint_label.pack(side="right", padx=(0, 5))
         self.counter_label.pack(side="left", padx=10, pady=5)
 
 
@@ -185,8 +165,9 @@ class ScreenCaptureModule:
 
             self.screenshots.append(img)
 
+            # Transition UI on first screenshot
             if len(self.screenshots) == 1:
-                self._activate_capture_controls()
+                self._transition_to_capture_ui()
 
             # Update UI counter
             if self.counter_label:

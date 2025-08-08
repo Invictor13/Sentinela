@@ -28,14 +28,15 @@ def main():
             print(f"Alerta de DPI: Não foi possível configurar a sensibilidade de DPI. Erro: {e}")
 
     root = tk.Tk()
-    root.attributes('-fullscreen', True)
+    root.withdraw()  # Oculta a janela principal inicialmente
+    root.state('zoomed') # Inicia a janela maximizada
 
-    # Função para sair da tela cheia
-    def exit_fullscreen(event=None):
-        root.attributes('-fullscreen', False)
+    # Função para sair do modo maximizado/tela cheia
+    def exit_zoom(event=None):
+        root.state('normal')
 
     # Vinculando a tecla Escape a esta função
-    root.bind('<Escape>', exit_fullscreen)
+    root.bind('<Escape>', exit_zoom)
 
     root.title("Sentinela Unimed")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
@@ -63,8 +64,6 @@ def main():
     recording_module = ScreenRecordingModule(root, save_path)
     main_app = MainApplication(root, capture_module, recording_module, app_config)
     main_app.pack(side="top", fill="both", expand=True)
-
-    root.withdraw()
 
     listener_thread = threading.Thread(
         target=key_listener_thread_proc,
