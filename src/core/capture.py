@@ -9,6 +9,7 @@ import re
 # Assuming these are the correct locations from the original file
 from ..ui.preparation_mode import PreparationOverlayManager
 from ..ui.dialogs import show_success_dialog
+from ..ui.capture_indicator import CaptureIndicator
 
 def is_valid_foldername(name):
     """ Helper function to validate folder names. """
@@ -22,6 +23,7 @@ class ScreenCaptureModule:
         self.root = root
         self.save_path = save_path
         self.overlay_manager = None # Will be instantiated in start_capture_session
+        self.capture_indicator = CaptureIndicator(self.root, self)
 
         # Attributes as per the blueprint
         self.is_in_session = False
@@ -42,7 +44,8 @@ class ScreenCaptureModule:
 
         # This part handles displaying overlays on all screens
         self.overlay_manager = PreparationOverlayManager(
-            self.root,
+            root=self.root,
+            indicator=self.capture_indicator,
             indicator_text="Pressione F9 para capturar a tela ativa",
             inactive_text="TELA INATIVA"
         )
