@@ -9,6 +9,8 @@ from PIL import Image, ImageTk
 from pynput.mouse import Controller as MouseController
 import tkinter as tk
 from tkinter import Toplevel, messagebox
+import configparser
+from ..config.settings import CONFIG_FILE
 
 from ..ui.recording_indicator import RecordingIndicator
 from ..ui.dialogs import show_success_dialog
@@ -227,13 +229,17 @@ class ScreenRecordingModule:
             self.root.deiconify()
 
     def recording_thread(self, target_to_record, quality_profile):
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+        quality_profile = config.get('Recording', 'quality', fallback='high')
+
         is_window_recording = False
         original_width, original_height = target_to_record['width'], target_to_record['height']
 
         if quality_profile == "compact":
             MAX_WIDTH, MAX_HEIGHT = 1280, 720
             recording_fps = 10.0
-        else:
+        else:  # 'high' is the default
             MAX_WIDTH, MAX_HEIGHT = 1920, 1080
             recording_fps = 15.0
 

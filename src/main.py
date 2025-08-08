@@ -8,7 +8,8 @@ from .core.capture import ScreenCaptureModule
 from .core.recording import ScreenRecordingModule
 from .core.hotkeys import key_listener_thread_proc
 from .app.tray_icon import setup_tray_icon
-from .config.settings import load_app_config
+from .config.settings import load_app_config, set_has_run_before_flag
+from .ui.dialogs import WelcomeWindow
 
 def resource_path(relative_path):
     try:
@@ -39,6 +40,11 @@ def main():
 
     app_config = load_app_config()
     save_path = app_config["DefaultSaveLocation"]
+
+    # --- First Run Check ---
+    if not app_config.get("HasRunBefore", False):
+        welcome_window = WelcomeWindow(root, set_has_run_before_flag)
+        root.wait_window(welcome_window)
 
     capture_module = ScreenCaptureModule(root, save_path)
     recording_module = ScreenRecordingModule(root, save_path)
