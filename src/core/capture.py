@@ -30,9 +30,9 @@ class ScreenCaptureModule:
         self.session_ui = None
         self.main_frame = None
         self.instruction_label = None
+        self.session_control_frame = None # Frame for the new UI
         self.counter_label = None
-        self.end_button = None
-        self.esc_hint_label = None
+        self.exit_label = None
 
     def start_capture_session(self):
         if self.is_in_session:
@@ -65,31 +65,12 @@ class ScreenCaptureModule:
         self.main_frame = tk.Frame(self.session_ui, bg=bg_color)
         self.main_frame.pack(fill="both", expand=True)
 
-        # --- Create all widgets upfront ---
-
-        # 1. Preparation-phase widget
+        # --- Create and show only the initial instruction label ---
         self.instruction_label = tk.Label(
             self.main_frame,
             text="Mire na tela e pressione F9 para capturar. Pressione ESC para sair.",
             bg=bg_color, fg=fg_color, font=(font_family, 12)
         )
-
-        # 2. Capture-phase widgets
-        self.end_button = tk.Button(
-            self.main_frame, text="CONCLUIR", command=self.end_capture_session,
-            bg="red", fg="white", font=(font_family, 10, "bold"), relief="flat", padx=10
-        )
-        self.esc_hint_label = tk.Label(
-            self.main_frame, text="ou pressione ESC para encerrar",
-            bg=bg_color, fg=fg_color, font=(font_family, 9)
-        )
-        self.counter_label = tk.Label(
-            self.main_frame, text="Total de Capturas: 0",
-            bg=bg_color, fg=fg_color, font=(font_family, 12)
-        )
-
-        # --- Initial layout ---
-        # Only show the instruction label initially
         self.instruction_label.pack(padx=10, pady=10)
 
         # Positioning the UI
@@ -98,17 +79,6 @@ class ScreenCaptureModule:
         x_pos = active_monitor['left'] + (active_monitor['width'] - ui_width) // 2
         y_pos = active_monitor['top'] + active_monitor['height'] - self.session_ui.winfo_height() - 20
         self.session_ui.geometry(f"+{x_pos}+{y_pos}")
-
-    def _transition_to_capture_ui(self):
-        """Hides preparation widgets and shows capture-in-progress widgets."""
-        # Hide preparation UI
-        self.instruction_label.pack_forget()
-
-        # Show capture UI (pack order matters for layout)
-        self.end_button.pack(side="right", padx=(0, 10), pady=5)
-        self.esc_hint_label.pack(side="right", padx=(0, 5))
-        self.counter_label.pack(side="left", padx=10, pady=5)
-
 
     def end_capture_session(self):
         if not self.is_in_session:
@@ -159,20 +129,46 @@ class ScreenCaptureModule:
         if not self.is_in_session:
             return
 
+        # The user's instructions are very specific about the order of operations.
+        # 1. Check if it's the first screenshot.
+        # 2. If so, transform the UI.
+        # 3. THEN, perform the capture.
+        # 4. FINALLY, update the state (list and counter).
+
         try:
+            # Step 1 & 2: Check and transform UI on first run.
+            if len(self.screenshots) == 0:
+                # Destrói o feitiço antigo
+                self.instruction_label.destroy()
+
+                # Forja o novo painel de controle permanente
+                # (Use um Frame para agrupar os novos elementos)
+                self.session_control_frame = tk.Frame(self.main_frame, bg="#282c34")
+                self.session_control_frame.pack(pady=5)
+
+                self.counter_label = tk.Label(
+                    self.session_control_frame,
+                    text="Total de Capturas: 1", # Starts at 1, as this runs before list update
+                    bg="#282c34", fg="white", font=("Segoe UI", 12)
+                )
+                self.counter_label.pack(side='left', padx=10)
+
+                self.exit_label = tk.Label(
+                    self.session_control_frame,
+                    text="Pressione ESC para Encerrar",
+                    bg="#282c34", fg="white", font=("Segoe UI", 10)
+                )
+                self.exit_label.pack(side='left', padx=10)
+
+            # Step 3: A lógica de captura da tela vem DEPOIS deste bloco
             with mss.mss() as sct:
                 sct_img = sct.grab(monitor)
                 img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
 
+            # Step 4: A lógica de adicionar à lista e atualizar o contador vem no final
             self.screenshots.append(img)
-
-            # Transition UI on first screenshot
-            if len(self.screenshots) == 1:
-                self._transition_to_capture_ui()
-
-            # Update UI counter
-            if self.counter_label:
-                self.counter_label.config(text=f"Total de Capturas: {len(self.screenshots)}")
+            # Atualiza o contador que agora garantidamente existe
+            self.counter_label.config(text=f"Total de Capturas: {len(self.screenshots)}")
 
             # Flash indicator for visual feedback
             if self.overlay_manager and self.overlay_manager.indicator:
