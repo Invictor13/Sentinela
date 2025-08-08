@@ -7,8 +7,7 @@ import mss
 import numpy as np
 from PIL import Image, ImageTk
 from pynput.mouse import Controller as MouseController
-import win32gui
-import win32con
+import pygetwindow as gw
 import tkinter as tk
 from tkinter import Toplevel, Listbox, END, SINGLE, ttk, messagebox
 
@@ -106,20 +105,22 @@ class ScreenRecordingModule:
         self.window_listbox.delete(0, END)
         self.available_windows = []
         seen_titles = set()
-        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", "Opção de Gravação", "Sentinela Unimed"}
 
-        def _enum_windows_callback(hwnd, lParam):
-            if win32gui.IsWindowVisible(hwnd):
-                title = win32gui.GetWindowText(hwnd)
-                if title and title not in seen_titles and title not in banned_titles:
-                    if win32gui.GetParent(hwnd) == 0:
-                        ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-                        if ex_style & win32con.WS_EX_APPWINDOW:
-                            self.available_windows.append({'title': title, 'hwnd': hwnd})
-                            self.window_listbox.insert(END, title)
-                            seen_titles.add(title)
+        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", "Opção de Gravação"}
 
-        win32gui.EnumWindows(_enum_windows_callback, None)
+        all_windows = gw.getAllWindows()
+        for window in all_windows:
+            if (window.title and
+                window.visible and
+                not window.isMinimized and
+                window.width > 10 and
+                window.height > 10 and
+                window.title not in seen_titles and
+                window.title not in banned_titles):
+
+                self.available_windows.append(window)
+                self.window_listbox.insert(END, window.title)
+                seen_titles.add(window.title)
 
     def on_monitor_select(self, event):
         self.window_listbox.selection_clear(0, END)
@@ -136,25 +137,14 @@ class ScreenRecordingModule:
         try:
             self.monitor_var.set('')
             selected_index = self.window_listbox.curselection()[0]
+            selected_title = self.window_listbox.get(selected_index)
             self.start_button.config(state=tk.DISABLED)
 
-            target_window_info = self.available_windows[selected_index]
-            if target_window_info:
-                hwnd = target_window_info['hwnd']
-                try:
-                    rect = win32gui.GetWindowRect(hwnd)
-                    left, top, right, bottom = rect
-                    width, height = right - left, bottom - top
-
-                    if width > 0 and height > 0:
-                        self.selected_window_obj = {
-                            'title': target_window_info['title'], 'hwnd': hwnd,
-                            'top': top, 'left': left, 'width': width, 'height': height
-                        }
-                        self.selected_area = {"top": top, "left": left, "width": width, "height": height}
-                        self.update_static_preview()
-                except win32gui.error:
-                    self.refresh_window_list()
+            target_window = next((w for w in self.available_windows if w.title == selected_title), None)
+            if target_window:
+                self.selected_window_obj = target_window
+                self.selected_area = {"top": target_window.top, "left": target_window.left, "width": target_window.width, "height": target_window.height}
+                self.update_static_preview()
         except IndexError:
             pass
 
@@ -190,10 +180,10 @@ class ScreenRecordingModule:
         quality_profile = self.quality_var.get()
         if self.selected_window_obj:
             try:
-                win32gui.SetForegroundWindow(self.selected_window_obj['hwnd'])
+                self.selected_window_obj.activate()
                 time.sleep(0.3)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Falha ao ativar janela: {e}")
         self.close_selection_window()
         self.start_recording_mode(target_to_record, quality_profile)
 
@@ -222,10 +212,10 @@ class ScreenRecordingModule:
         self.root.deiconify()
 
     def recording_thread(self, target_to_record, quality_profile):
-        is_window_recording = 'hwnd' in target_to_record
+        is_window_recording = hasattr(target_to_record, 'title')
 
         if is_window_recording:
-            original_width, original_height = target_to_record['width'], target_to_record['height']
+            original_width, original_height = target_to_record.width, target_to_record.height
         else:
             original_width, original_height = target_to_record['width'], target_to_record['height']
 
@@ -246,11 +236,12 @@ class ScreenRecordingModule:
             else:
                 output_height = MAX_HEIGHT
                 output_width = int(output_height * aspect_ratio)
-            if output_width % 2 != 0:
-                output_width -=1
-            if output_height % 2 != 0:
-                output_height -=1
             print(f"Alerta: Resolução original ({original_width}x{original_height}) redimensionada para ({output_width}x{output_height}) para otimização.")
+
+        if output_width % 2 != 0:
+            output_width -= 1
+        if output_height % 2 != 0:
+            output_height -= 1
 
         width, height = output_width, output_height
 
@@ -262,7 +253,7 @@ class ScreenRecordingModule:
         for codec in codecs_to_try:
             fourcc = cv2.VideoWriter_fourcc(*codec)
             try:
-                self.out = cv.VideoWriter(filename, fourcc, recording_fps, (width, height))
+                self.out = cv2.VideoWriter(filename, fourcc, recording_fps, (width, height))
                 if self.out.isOpened():
                     print(f"Sucesso: Codec '{codec}' invocado com sucesso a {recording_fps} FPS.")
                     break
@@ -279,6 +270,49 @@ class ScreenRecordingModule:
         except FileNotFoundError:
             cursor_img = None
         mouse_controller = MouseController()
+        with mss.mss() as sct:
+            while self.is_recording:
+                loop_start_time = time.time()
+                try:
+                    if is_window_recording:
+                        if not target_to_record.visible or target_to_record.isMinimized:
+                            self.is_recording = False
+                            continue
+                        capture_area = {'top': target_to_record.top, 'left': target_to_record.left, 'width': original_width, 'height': original_height}
+                    else:
+                        capture_area = target_to_record
+
+                    sct_img = sct.grab(capture_area)
+                    frame_np = np.array(sct_img)
+
+                    if (original_width, original_height) != (width, height):
+                        frame_np_resized = cv2.resize(frame_np, (width, height), interpolation=cv2.INTER_AREA)
+                    else:
+                        frame_np_resized = frame_np
+
+                    frame_pil = Image.fromarray(cv2.cvtColor(frame_np_resized, cv2.COLOR_BGRA2RGB))
+
+                    if cursor_img:
+                        mouse_pos = mouse_controller.position
+                        cursor_x_in_capture = mouse_pos[0] - capture_area['left']
+                        cursor_y_in_capture = mouse_pos[1] - capture_area['top']
+                        scaled_cursor_x = int(cursor_x_in_capture * (width / original_width))
+                        scaled_cursor_y = int(cursor_y_in_capture * (height / original_height))
+                        frame_pil.paste(cursor_img, (scaled_cursor_x, scaled_cursor_y), cursor_img)
+
+                    self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
+
+                except Exception as e:
+                    print(f"Erro durante o loop de gravação: {e}")
+                    self.is_recording = False
+
+                sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+        if self.out:
+            self.out.release()
+
         def finalize_on_main_thread():
             if os.path.exists(filename) and os.path.getsize(filename) > 0:
                 show_success_dialog(self.root, "Gravação salva.", os.path.dirname(filename), filename)
