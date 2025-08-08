@@ -1,48 +1,57 @@
 import tkinter as tk
 from tkinter import Toplevel
-from PIL import Image, ImageTk
 
-
-class RecordingIndicator(Toplevel):
-    def __init__(self, parent, recording_module):
+class PreparationIndicator(Toplevel):
+    def __init__(self, parent):
         super().__init__(parent)
-        self.recording_module = recording_module
         self.animation_id = None
-        self.logo_photo = None
-
         self.overrideredirect(True)
         self.wm_attributes("-topmost", True)
         self.withdraw()
-
-        # Container principal que será reconfigurado para cada modo
         self.container = tk.Frame(self)
         self.container.pack(fill="both", expand=True)
+        # To be populated by the calling module if needed
+        self.module_instance = None
+        self.active_monitor_for_recording = None # Legacy for `show` method
 
     def _clear_container(self):
         for widget in self.container.winfo_children():
             widget.destroy()
 
-    def show_preparation_mode(self, monitor_geom):
+    def show_preparation_mode(self, monitor_geom, text=""):
         self._clear_container()
         self.container.configure(bg='#2b2b2b', padx=10, pady=5)
 
-        # Ícone e texto para o modo de preparação
         prep_label = tk.Label(self.container, text="● Preparando", font=("Segoe UI", 12, "bold"), fg="#ffcc00", bg=self.container.cget('bg'))
         prep_label.pack(side="left", padx=(0, 10))
 
-        info_label = tk.Label(self.container, text="Pronto para gravar (F10)", font=("Segoe UI", 10), fg="white", bg=self.container.cget('bg'))
+        info_label = tk.Label(self.container, text=text, font=("Segoe UI", 10), fg="white", bg=self.container.cget('bg'))
         info_label.pack(side="left", padx=(0, 15))
-
-        start_button = tk.Button(self.container, text="INICIAR", font=("Segoe UI", 9, "bold"), fg="black", bg="#ffcc00", relief="flat",
-                                 command=self.recording_module.start_recording_mode, bd=0, padx=10, pady=2)
-        start_button.pack(side="left", padx=(0, 5))
 
         self._display_window(monitor_geom)
 
     def hide_preparation_mode(self):
         self.withdraw()
 
-    def show(self):
+    def _display_window(self, monitor_geom):
+        if not monitor_geom: return
+        self.update_idletasks()
+        x = monitor_geom['left'] + monitor_geom['width'] - self.winfo_reqwidth() - 20
+        y = monitor_geom['top'] + 20
+        self.geometry(f"+{x}+{y}")
+        self.deiconify()
+
+    def hide(self):
+        if self.animation_id:
+            self.after_cancel(self.animation_id)
+        self.animation_id = None
+        self.withdraw()
+
+    # --- Legacy methods for ScreenRecordingModule ---
+    # This part remains to avoid breaking the recording functionality,
+    # but ideally, it would be in its own `RecordingStateIndicator` class.
+
+    def show(self, monitor_geom):
         """ Mostra o indicador no modo de gravação normal. """
         self._clear_container()
         self.container.configure(bg='#2b2b2b', padx=10, pady=5)
@@ -57,26 +66,16 @@ class RecordingIndicator(Toplevel):
         self.info_label.pack(side="left", padx=(0, 15))
 
         stop_button = tk.Button(self.container, text="PARAR", font=("Segoe UI", 9, "bold"), fg="white", bg="#c70000", relief="flat",
-                                command=self.recording_module.stop_recording, bd=0, padx=10, pady=2)
+                                command=self.module_instance.stop_recording, bd=0, padx=10, pady=2)
         stop_button.pack(side="left", padx=(0, 5))
 
         self.update_time(0)
-        # For recording, it can appear on the primary monitor or a specific one.
-        # For now, let's keep it simple and use the active recording monitor.
-        self._display_window(self.recording_module.active_monitor_for_recording)
+        self._display_window(monitor_geom)
         if self.animation_id is None:
             self._animate_rec()
 
-    def _display_window(self, monitor_geom):
-        self.update_idletasks()
-        # Position the indicator at the top-right corner of the specified monitor
-        x = monitor_geom['left'] + monitor_geom['width'] - self.winfo_reqwidth() - 20
-        y = monitor_geom['top'] + 20
-        self.geometry(f"+{x}+{y}")
-        self.deiconify()
-
     def _animate_rec(self):
-        if not self.winfo_exists() or not self.recording_module.is_recording:
+        if not self.winfo_exists() or not (self.module_instance and self.module_instance.is_recording):
             if self.animation_id:
                 self.after_cancel(self.animation_id)
                 self.animation_id = None
@@ -86,12 +85,6 @@ class RecordingIndicator(Toplevel):
         new_color = self.cget('bg') if current_color == '#ff0000' else '#ff0000'
         self.rec_label.config(fg=new_color)
         self.animation_id = self.after(700, self._animate_rec)
-
-    def hide(self):
-        if self.animation_id:
-            self.after_cancel(self.animation_id)
-        self.animation_id = None
-        self.withdraw()
 
     def update_time(self, elapsed_seconds):
         if hasattr(self, 'time_label') and self.time_label.winfo_exists():

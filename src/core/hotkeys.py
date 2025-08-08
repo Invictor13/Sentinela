@@ -41,11 +41,22 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
     record_hotkey_str = config.get('Hotkeys', 'record', fallback='F10')
 
     def on_activate_capture():
-        if not recording_module.is_recording:
-            root_window.after(0, capture_module.start_capture_mode)
+        # Prevent capture from starting if a recording is in progress.
+        if recording_module.state != "idle":
+            return
+
+        if capture_module.is_preparing:
+            # Second press: take the screenshot
+            active_monitor = capture_module.overlay_manager.get_active_monitor()
+            if active_monitor:
+                root_window.after(0, capture_module.take_screenshot, active_monitor)
+        else:
+            # First press: enter preparation mode
+            root_window.after(0, capture_module.enter_preparation_mode)
 
     def on_activate_record():
-        if capture_module.capturing:
+        # Prevent recording from starting if a capture is in preparation.
+        if capture_module.is_preparing:
             return
 
         state = recording_module.state
