@@ -45,18 +45,18 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
         if recording_module.state != "idle":
             return
 
-        if capture_module.is_preparing:
-            # If already preparing, take a screenshot of the active monitor.
+        if not capture_module.is_in_session:
+            # First press: Inicia a sessão de captura.
+            root_window.after(0, capture_module.start_capture_session)
+        else:
+            # Pressões subsequentes: Tira um print da tela ativa no momento.
             active_monitor = capture_module.overlay_manager.get_active_monitor()
             if active_monitor:
                 root_window.after(0, capture_module.take_screenshot, active_monitor)
-        else:
-            # First press: enter preparation mode.
-            root_window.after(0, capture_module.enter_preparation_mode)
 
     def on_activate_record():
         # Prevent recording from starting if a capture is in preparation.
-        if capture_module.is_preparing:
+        if capture_module.is_in_session:
             return
 
         state = recording_module.state
@@ -78,8 +78,8 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
 
         def on_escape():
             """Cancels any active preparation mode."""
-            if capture_module.is_preparing:
-                root_window.after(0, capture_module.exit_preparation_mode)
+            if capture_module.is_in_session:
+                root_window.after(0, capture_module.end_capture_session)
             elif recording_module.is_preparing:
                 root_window.after(0, recording_module.exit_preparation_mode)
 

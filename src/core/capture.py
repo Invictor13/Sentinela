@@ -1,5 +1,6 @@
 import os
 import mss
+import tkinter as tk
 from PIL import Image
 from datetime import datetime
 from tkinter import simpledialog
@@ -18,51 +19,129 @@ class ScreenCaptureModule:
     def __init__(self, root, save_path):
         self.root = root
         self.save_path = save_path
-        self.is_preparing = False
-        self.overlay_manager = None
         self.indicator = PreparationIndicator(self.root)
-        # Session-specific attributes for multi-capture
-        self.session_save_path = None
-        self.session_capture_count = 0
+        self.overlay_manager = None
 
-    def enter_preparation_mode(self):
-        if self.is_preparing:
+        # Session state
+        self.is_in_session = False
+        self.screenshots = []
+
+        # Session UI
+        self.session_ui = None
+        self.counter_label = None
+
+    def start_capture_session(self):
+        if self.is_in_session:
             return
 
-        # Reset session state at the beginning of a new preparation
-        self.session_save_path = None
-        self.session_capture_count = 0
+        self.is_in_session = True
+        self.screenshots = []
 
-        self.is_preparing = True
         self.overlay_manager = PreparationOverlayManager(
             self.root,
             self.indicator,
-            indicator_text="Mire na tela e pressione F9 para Capturar",
+            indicator_text="Pressione F9 para capturar a tela ativa",
             inactive_text="Esta tela não será capturada"
         )
         self.overlay_manager.start()
+        self._create_session_ui()
 
-    def exit_preparation_mode(self):
-        if not self.is_preparing:
+    def _create_session_ui(self):
+        active_monitor = self.overlay_manager.get_active_monitor()
+        if not active_monitor:
+            # Fallback or log error if no active monitor found
             return
 
+        self.session_ui = tk.Toplevel(self.root)
+        self.session_ui.overrideredirect(True)
+        self.session_ui.wm_attributes("-topmost", True)
+        self.session_ui.wm_attributes("-alpha", 0.9)
+
+        # Style
+        bg_color = "#282c34"
+        fg_color = "white"
+        font_family = "Segoe UI"
+
+        # Main frame
+        main_frame = tk.Frame(self.session_ui, bg=bg_color)
+        main_frame.pack(fill="both", expand=True)
+
+        # Counter Label
+        self.counter_label = tk.Label(
+            main_frame,
+            text="Capturas: 0",
+            bg=bg_color,
+            fg=fg_color,
+            font=(font_family, 12)
+        )
+        self.counter_label.pack(side="left", padx=10, pady=5)
+
+        # End Session Button
+        end_button = tk.Button(
+            main_frame,
+            text="Concluir & Salvar",
+            command=self.end_capture_session,
+            bg="#61afef",
+            fg="white",
+            font=(font_family, 10, "bold"),
+            relief="flat",
+            padx=10
+        )
+        end_button.pack(side="right", padx=10, pady=5)
+
+        # Positioning the UI at the bottom-center of the active monitor
+        self.session_ui.update_idletasks()
+        ui_width = self.session_ui.winfo_width()
+        x_pos = active_monitor['left'] + (active_monitor['width'] - ui_width) // 2
+        y_pos = active_monitor['top'] + active_monitor['height'] - self.session_ui.winfo_height() - 20 # 20px offset from bottom
+        self.session_ui.geometry(f"+{x_pos}+{y_pos}")
+
+    def end_capture_session(self):
+        if not self.is_in_session:
+            return
+
+        # Destroy UI elements first
         if self.overlay_manager:
             self.overlay_manager.destroy()
             self.overlay_manager = None
+        if self.session_ui:
+            self.session_ui.destroy()
+            self.session_ui = None
 
-        self.is_preparing = False
-        self.root.deiconify()
+        self.is_in_session = False
+        self.root.deiconify() # Show the main window again
 
-        # Show a summary dialog if screenshots were taken in this session
-        if self.session_capture_count > 0 and self.session_save_path:
+        # Proceed to save if screenshots were taken
+        if not self.screenshots:
+            return # No need to ask for folder name if nothing was captured
+
+        try:
+            folder_name_input = simpledialog.askstring(
+                "Salvar Evidências",
+                "Digite o nome da pasta para esta sessão de capturas:",
+                parent=self.root
+            )
+            base_folder_name = folder_name_input if folder_name_input and is_valid_foldername(folder_name_input) else f"Evidencia_Captura_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            session_save_path = os.path.join(self.save_path, base_folder_name)
+            os.makedirs(session_save_path, exist_ok=True)
+
+            for i, img in enumerate(self.screenshots):
+                filename = f"captura_{i+1:03d}_{datetime.now().strftime('%H%M%S')}.png"
+                full_path = os.path.join(session_save_path, filename)
+                img.save(full_path)
+
             show_success_dialog(
                 self.root,
-                f"{self.session_capture_count} captura(s) salva(s) com sucesso!",
-                self.session_save_path
+                f"{len(self.screenshots)} captura(s) salva(s) com sucesso!",
+                session_save_path
             )
+        finally:
+            # Ensure screenshots list is cleared even if user cancels the dialog
+            self.screenshots = []
+
 
     def take_screenshot(self, monitor):
-        if not self.is_preparing:
+        if not self.is_in_session:
             return
 
         try:
@@ -70,29 +149,15 @@ class ScreenCaptureModule:
                 sct_img = sct.grab(monitor)
                 img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
 
-            # --- Folder Management for the Session ---
-            # Ask for folder name only on the first capture of the session
-            if not self.session_save_path:
-                folder_name_input = simpledialog.askstring(
-                    "Salvar Evidências",
-                    "Digite o nome da pasta para esta sessão de capturas:",
-                    parent=self.root
-                )
-                base_folder_name = folder_name_input if folder_name_input and is_valid_foldername(folder_name_input) else f"Evidencia_Captura_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-                self.session_save_path = os.path.join(self.save_path, base_folder_name)
-                os.makedirs(self.session_save_path, exist_ok=True)
+            self.screenshots.append(img)
 
-            # --- Save the screenshot ---
-            self.session_capture_count += 1
-            filename = f"captura_{self.session_capture_count:03d}_{datetime.now().strftime('%H%M%S')}.png"
-            full_path = os.path.join(self.session_save_path, filename)
-            img.save(full_path)
+            # Update UI counter
+            if self.counter_label:
+                self.counter_label.config(text=f"Capturas: {len(self.screenshots)}")
 
-            # Optionally, give some visual feedback that a capture was taken
-            # For example, flash the indicator
+            # Flash indicator for visual feedback
             if self.overlay_manager and self.overlay_manager.indicator:
                 self.overlay_manager.indicator.flash_success()
-
 
         except Exception as e:
             print(f"Erro de Captura: {e}")
