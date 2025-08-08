@@ -35,6 +35,22 @@ class ScreenRecordingModule:
     def is_recording(self):
         return self.state == "recording"
 
+    @property
+    def is_preparing(self):
+        return self.state == "preparing"
+
+    def exit_preparation_mode(self):
+        if self.state != "preparing":
+            return
+
+        if self.overlay_manager:
+            self.overlay_manager.destroy()
+            self.overlay_manager = None
+
+        self.state = "idle"
+        # Ensure the main window is visible again
+        self.root.deiconify()
+
     def enter_preparation_mode(self, record_all_screens=False):
         print(f"[RUNA DE DEPURAÇÃO] Modo de Preparação iniciado com record_all_screens = {record_all_screens}")
         self.should_record_all_screens = record_all_screens
