@@ -76,9 +76,17 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
         parsed_capture_hotkey = parse_hotkey_string(capture_hotkey_str)
         parsed_record_hotkey = parse_hotkey_string(record_hotkey_str)
 
+        def on_escape():
+            """Cancels any active preparation mode."""
+            if capture_module.is_preparing:
+                root_window.after(0, capture_module.exit_preparation_mode)
+            elif recording_module.is_preparing:
+                root_window.after(0, recording_module.exit_preparation_mode)
+
         hotkeys = {
             parsed_capture_hotkey: on_activate_capture,
-            parsed_record_hotkey: on_activate_record
+            parsed_record_hotkey: on_activate_record,
+            '<esc>': on_escape
         }
 
         with keyboard.GlobalHotKeys(hotkeys) as h:
