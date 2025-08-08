@@ -50,6 +50,7 @@ class MainApplication(tk.Frame):
         self.capture_module = capture_module
         self.recording_module = recording_module
         self.app_config = app_config
+        self.record_all_screens_var = tk.BooleanVar(value=False)
         self.configure(bg=COR_FUNDO_JANELA)
 
         self.canvas = tk.Canvas(self, bg=COR_FUNDO_JANELA, highlightthickness=0)
@@ -83,8 +84,22 @@ class MainApplication(tk.Frame):
         content_container.pack(expand=True, fill="both")
         btn1 = tk.Button(content_container, text="INICIAR CAPTURA (F9)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.capture_module.start_capture_mode)
         btn1.pack(pady=(5,10), fill='x')
-        btn2 = tk.Button(content_container, text="INICIAR GRAVAÇÃO (F10)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.recording_module.enter_preparation_mode)
+        btn2 = tk.Button(content_container, text="INICIAR GRAVAÇÃO (F10)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=lambda: self.recording_module.enter_preparation_mode(record_all_screens=self.record_all_screens_var.get()))
         btn2.pack(pady=(5,10), fill='x')
+
+        record_all_checkbox = tk.Checkbutton(
+            content_container,
+            text="Gravar todas as telas simultaneamente (experimental)",
+            variable=self.record_all_screens_var,
+            bg=COR_CARD,
+            fg=COR_TEXTO_SECUNDARIO,
+            activebackground=COR_CARD,
+            activeforeground=COR_TEXTO_PRINCIPAL,
+            selectcolor=COR_FUNDO_JANELA,
+            font=("Segoe UI", 9)
+        )
+        record_all_checkbox.pack(pady=(0, 10))
+
         for btn in [btn1, btn2]:
             btn.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
             btn.bind("<Leave>", lambda e: e.widget.config(bg=COR_BOTAO))
