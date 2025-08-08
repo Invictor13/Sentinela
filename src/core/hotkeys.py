@@ -33,7 +33,7 @@ def parse_hotkey_string(hotkey_string):
     return "+".join(pynput_parts)
 
 
-def key_listener_thread_proc(capture_module, recording_module, root_window):
+def key_listener_thread_proc(capture_module, recording_module, root_window, main_app_instance):
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
 
@@ -50,7 +50,10 @@ def key_listener_thread_proc(capture_module, recording_module, root_window):
 
         state = recording_module.state
         if state == "idle":
-            root_window.after(0, recording_module.enter_preparation_mode)
+            # Consulta o estado do checkbox na UI principal
+            record_all = main_app_instance.record_all_screens_var.get()
+            # Inicia o modo de preparação passando o estado correto
+            root_window.after(0, recording_module.enter_preparation_mode, record_all)
         elif state == "preparing":
             # The quality profile is now read inside the recording thread
             root_window.after(0, recording_module.start_recording_mode)
