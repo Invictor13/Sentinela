@@ -46,12 +46,12 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
             return
 
         if capture_module.is_preparing:
-            # Second press: take the screenshot
+            # If already preparing, take a screenshot of the active monitor.
             active_monitor = capture_module.overlay_manager.get_active_monitor()
             if active_monitor:
                 root_window.after(0, capture_module.take_screenshot, active_monitor)
         else:
-            # First press: enter preparation mode
+            # First press: enter preparation mode.
             root_window.after(0, capture_module.enter_preparation_mode)
 
     def on_activate_record():
