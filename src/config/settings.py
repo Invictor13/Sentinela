@@ -63,12 +63,3 @@ def save_app_config(config_parser_obj, save_path, quality, capture_hotkey, recor
 
     with open(CONFIG_FILE, 'w') as configfile:
         config_parser_obj.write(configfile)
-
-def set_has_run_before_flag():
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE)
-    if not config.has_section('User'):
-        config.add_section('User')
-    config.set('User', 'has_run_before', 'true')
-    with open(CONFIG_FILE, 'w') as configfile:
-        config.write(configfile)

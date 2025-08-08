@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import Toplevel, filedialog, messagebox, ttk
 import os
+from tkinter import font as tkfont
 
 from ..config.settings import save_app_config
 
@@ -9,13 +10,19 @@ COR_TEXTO_PRINCIPAL = "#005a36"
 COR_TEXTO_SECUNDARIO = "#555555"
 
 class SettingsWindow(Toplevel):
-    def __init__(self, parent, app_config, on_close_callback):
+    def __init__(self, parent, app_config, on_close_callback=None, is_first_run=False):
         super().__init__(parent)
         self.app_config = app_config
         self.on_close_callback = on_close_callback
+        self.is_first_run = is_first_run
 
-        self.title("Configurações")
-        self.geometry("500x380") # Increased height
+        # --- Window Setup ---
+        if self.is_first_run:
+            self.title("Bem-vindo! Vamos configurar seu Sentinela")
+        else:
+            self.title("Configurações")
+
+        self.geometry("500x500")
         self.configure(bg=COR_FUNDO_JANELA)
         self.resizable(False, False)
         self.transient(parent)
@@ -25,46 +32,76 @@ class SettingsWindow(Toplevel):
         main_frame = tk.Frame(self, bg=COR_FUNDO_JANELA, padx=20, pady=20)
         main_frame.pack(expand=True, fill="both")
 
+        current_row = 0
+
+        # --- Welcome Message on First Run ---
+        if self.is_first_run:
+            welcome_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
+            welcome_frame.grid(row=current_row, column=0, columnspan=3, sticky="w", pady=(0, 15))
+            current_row += 1
+
+            tk.Label(welcome_frame, text="Bem-vindo ao Sentinela!", font=("Segoe UI", 12, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).pack(anchor="w")
+            tk.Label(welcome_frame, text="Configure suas preferências abaixo. Você sempre pode mudar isso depois\nclicando no ícone de engrenagem (⚙️).",
+                     font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO, justify="left").pack(anchor="w", pady=(5,0))
+
+            ttk.Separator(main_frame, orient='horizontal').grid(row=current_row, column=0, columnspan=3, sticky='ew', pady=(0, 15))
+            current_row += 1
+
+        title_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+
         # --- Editable Hotkeys ---
-        tk.Label(main_frame, text="Atalhos de Teclado:", font=("Segoe UI", 10, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        tk.Label(main_frame, text="Atalhos", font=title_font, bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=current_row, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        current_row += 1
 
         # Capture Hotkey
-        tk.Label(main_frame, text="Captura de Tela:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).grid(row=1, column=0, sticky="w", pady=(0, 5))
+        tk.Label(main_frame, text="Captura de Tela:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).grid(row=current_row, column=0, sticky="w", pady=(0, 5))
         self.capture_hotkey_var = tk.StringVar(value=self.app_config.get("CaptureHotkey", "F9"))
-        tk.Entry(main_frame, textvariable=self.capture_hotkey_var, state="readonly", width=20).grid(row=1, column=1, sticky="ew", padx=5)
-        tk.Button(main_frame, text="Alterar...", command=lambda: self.change_hotkey_dialog('capture'), font=("Segoe UI", 9)).grid(row=1, column=2, padx=(5, 0))
+        tk.Entry(main_frame, textvariable=self.capture_hotkey_var, state="readonly", width=20).grid(row=current_row, column=1, sticky="ew", padx=5)
+        tk.Button(main_frame, text="Alterar...", command=lambda: self.change_hotkey_dialog('capture'), font=("Segoe UI", 9)).grid(row=current_row, column=2, padx=(5, 0))
+        current_row += 1
 
         # Record Hotkey
-        tk.Label(main_frame, text="Gravação de Vídeo:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).grid(row=2, column=0, sticky="w", pady=(0, 5))
+        tk.Label(main_frame, text="Gravação de Vídeo:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO).grid(row=current_row, column=0, sticky="w", pady=(0, 5))
         self.record_hotkey_var = tk.StringVar(value=self.app_config.get("RecordHotkey", "F10"))
-        tk.Entry(main_frame, textvariable=self.record_hotkey_var, state="readonly", width=20).grid(row=2, column=1, sticky="ew", padx=5)
-        tk.Button(main_frame, text="Alterar...", command=lambda: self.change_hotkey_dialog('record'), font=("Segoe UI", 9)).grid(row=2, column=2, padx=(5, 0))
+        tk.Entry(main_frame, textvariable=self.record_hotkey_var, state="readonly", width=20).grid(row=current_row, column=1, sticky="ew", padx=5)
+        tk.Button(main_frame, text="Alterar...", command=lambda: self.change_hotkey_dialog('record'), font=("Segoe UI", 9)).grid(row=current_row, column=2, padx=(5, 0))
+        current_row += 1
+
+        ttk.Separator(main_frame, orient='horizontal').grid(row=current_row, column=0, columnspan=3, sticky='ew', pady=15)
+        current_row += 1
 
         # --- Save Path ---
-        tk.Label(main_frame, text="Pasta Padrão:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=3, column=0, sticky="w", pady=(20, 0)) # Added padding
+        tk.Label(main_frame, text="Pasta Padrão", font=title_font, bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=current_row, column=0, sticky="w", pady=(0, 5))
+        current_row += 1
 
         self.save_path_var = tk.StringVar(value=self.app_config["DefaultSaveLocation"])
-        tk.Entry(main_frame, textvariable=self.save_path_var, state="readonly").grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        tk.Entry(main_frame, textvariable=self.save_path_var, state="readonly").grid(row=current_row, column=0, columnspan=2, sticky="ew", pady=(0, 5))
 
         browse_button = tk.Button(main_frame, text="Procurar...", command=self.browse_save_path, font=("Segoe UI", 9))
-        browse_button.grid(row=4, column=2, padx=(5, 0))
+        browse_button.grid(row=current_row, column=2, padx=(5, 0))
+        current_row += 1
+
+        ttk.Separator(main_frame, orient='horizontal').grid(row=current_row, column=0, columnspan=3, sticky='ew', pady=15)
+        current_row += 1
 
         # Quality Settings
-        tk.Label(main_frame, text="Qualidade de Gravação:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=5, column=0, sticky="w", pady=(10, 0))
+        tk.Label(main_frame, text="Qualidade de Gravação", font=title_font, bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=current_row, column=0, sticky="w", pady=(0, 5))
+        current_row += 1
 
         self.quality_var = tk.StringVar(value=self.app_config.get("RecordingQuality", "high"))
 
         quality_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
-        quality_frame.grid(row=6, column=0, columnspan=3, sticky="w", padx=20)
+        quality_frame.grid(row=current_row, column=0, columnspan=3, sticky="w", padx=20)
+        current_row += 1
 
         style = ttk.Style()
         style.configure("TRadiobutton", background=COR_FUNDO_JANELA, foreground=COR_TEXTO_SECUNDARIO)
 
-        ttk.Radiobutton(quality_frame, text="Full HD (MP4) - Ideal para edição e visualização local.", variable=self.quality_var, value="high", style="TRadiobutton").pack(anchor="w")
-        ttk.Radiobutton(quality_frame, text="Web (720p) - Otimizado para compartilhamento rápido.", variable=self.quality_var, value="compact", style="TRadiobutton").pack(anchor="w")
+        ttk.Radiobutton(quality_frame, text="Full HD (MP4) - Alta Qualidade, Ideal para Edição e Visualização Local", variable=self.quality_var, value="high", style="TRadiobutton").pack(anchor="w")
+        ttk.Radiobutton(quality_frame, text="HD (WEB) - Otimizado para o compartilhamento rápido.", variable=self.quality_var, value="compact", style="TRadiobutton").pack(anchor="w")
 
         buttons_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
-        buttons_frame.grid(row=7, column=0, columnspan=3, pady=(20,0))
+        buttons_frame.grid(row=current_row, column=0, columnspan=3, pady=(20,0))
 
         tk.Button(buttons_frame, text="Salvar Configurações", command=self.save_settings, font=("Segoe UI", 10, "bold")).pack(side="left", padx=10)
         tk.Button(buttons_frame, text="Fechar", command=self.destroy, font=("Segoe UI", 10)).pack(side="left", padx=10)
@@ -121,8 +158,15 @@ class SettingsWindow(Toplevel):
             messagebox.showerror("Erro de Caminho", "Não é possível escrever no caminho.", parent=self)
             return
 
+        config_parser_obj = self.app_config["config_parser_obj"]
+
+        if self.is_first_run:
+            if not config_parser_obj.has_section('User'):
+                config_parser_obj.add_section('User')
+            config_parser_obj.set('User', 'has_run_before', 'true')
+
         save_app_config(
-            self.app_config["config_parser_obj"],
+            config_parser_obj,
             new_save_path,
             new_quality,
             new_capture_hotkey,
@@ -132,6 +176,7 @@ class SettingsWindow(Toplevel):
         self.app_config["RecordingQuality"] = new_quality
         self.app_config["CaptureHotkey"] = new_capture_hotkey
         self.app_config["RecordHotkey"] = new_record_hotkey
+        self.app_config["HasRunBefore"] = True
 
 
         if self.on_close_callback:
