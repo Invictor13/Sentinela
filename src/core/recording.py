@@ -39,9 +39,15 @@ class ScreenRecordingModule:
         return self.state == "recording"
 
     # --- MODIFIED: enter_preparation_mode ---
-    def enter_preparation_mode(self):
+    def enter_preparation_mode(self, record_all_screens=False):
         if self.state != "idle":
             return
+
+        if record_all_screens:
+            # Bypassa o modo de preparação e inicia a gravação diretamente
+            self.start_recording_mode(record_all_screens=True)
+            return
+
         self.state = "preparing"
         self.root.withdraw()
 
@@ -202,15 +208,18 @@ class ScreenRecordingModule:
         self.recording_indicator.hide_preparation_mode()
 
     # --- MODIFIED: start_recording_mode ---
-    def start_recording_mode(self, quality_profile="high"):
-        if self.state != "preparing":
+    def start_recording_mode(self, quality_profile="high", record_all_screens=False):
+        if self.state == "preparing":
+            self._destroy_preparation_overlays()
+        elif self.state != "idle":
             return
 
-        self._destroy_preparation_overlays()
         self.state = "recording"
+        self.root.withdraw() # Garante que a janela principal esteja oculta
         time.sleep(0.2)
 
-        self.thread_gravacao = threading.Thread(target=self.recording_thread, args=(self.active_monitor_for_recording, quality_profile), daemon=True)
+        target_monitor = self.active_monitor_for_recording if not record_all_screens else None
+        self.thread_gravacao = threading.Thread(target=self.recording_thread, args=(target_monitor, quality_profile, record_all_screens), daemon=True)
         self.thread_gravacao.start()
 
         self.recording_indicator.show()
@@ -228,36 +237,52 @@ class ScreenRecordingModule:
             self._destroy_preparation_overlays()
             self.root.deiconify()
 
-    def recording_thread(self, target_to_record, quality_profile):
+    def recording_thread(self, target_to_record, quality_profile, record_all_screens=False):
         config = configparser.ConfigParser()
         config.read(CONFIG_FILE)
         quality_profile = config.get('Recording', 'quality', fallback='high')
 
-        is_window_recording = False
-        original_width, original_height = target_to_record['width'], target_to_record['height']
-
-        if quality_profile == "compact":
-            MAX_WIDTH, MAX_HEIGHT = 1280, 720
-            recording_fps = 10.0
-        else:  # 'high' is the default
-            MAX_WIDTH, MAX_HEIGHT = 1920, 1080
-            recording_fps = 15.0
-
-        output_width, output_height = original_width, original_height
-        if original_width > MAX_WIDTH or original_height > MAX_HEIGHT:
-            aspect_ratio = original_width / original_height
-            if aspect_ratio > (MAX_WIDTH / MAX_HEIGHT):
-                output_width = MAX_WIDTH
-                output_height = int(output_width / aspect_ratio)
-            else:
-                output_height = MAX_HEIGHT
-                output_width = int(output_height * aspect_ratio)
-
-        if output_width % 2 != 0: output_width -= 1
-        if output_height % 2 != 0: output_height -= 1
-
-        width, height = output_width, output_height
         filename = os.path.join(self.save_path, f"Evidencia_Gravacao_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4")
+
+        try:
+            cursor_img = Image.open("assets/cursor.png").convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
+        except FileNotFoundError:
+            cursor_img = None
+
+        mouse_controller = MouseController()
+
+        if record_all_screens:
+            monitors = self.sct.monitors[1:]
+            total_width = sum(m['width'] for m in monitors)
+            max_height = max(m['height'] for m in monitors)
+
+            if total_width % 2 != 0: total_width += 1
+            if max_height % 2 != 0: max_height += 1
+
+            width, height = total_width, max_height
+            recording_fps = 15.0
+        else:
+            original_width, original_height = target_to_record['width'], target_to_record['height']
+            if quality_profile == "compact":
+                MAX_WIDTH, MAX_HEIGHT = 1280, 720
+                recording_fps = 10.0
+            else:
+                MAX_WIDTH, MAX_HEIGHT = 1920, 1080
+                recording_fps = 15.0
+
+            output_width, output_height = original_width, original_height
+            if original_width > MAX_WIDTH or original_height > MAX_HEIGHT:
+                aspect_ratio = original_width / original_height
+                if aspect_ratio > (MAX_WIDTH / MAX_HEIGHT):
+                    output_width = MAX_WIDTH
+                    output_height = int(output_width / aspect_ratio)
+                else:
+                    output_height = MAX_HEIGHT
+                    output_width = int(output_height * aspect_ratio)
+
+            if output_width % 2 != 0: output_width -= 1
+            if output_height % 2 != 0: output_height -= 1
+            width, height = output_width, output_height
 
         codecs_to_try = ['X264', 'avc1', 'mp4v']
         self.out = None
@@ -273,38 +298,67 @@ class ScreenRecordingModule:
             self.root.after(0, self.stop_recording)
             return
 
-        try:
-            cursor_img = Image.open("assets/cursor.png").convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
-        except FileNotFoundError: cursor_img = None
-
-        mouse_controller = MouseController()
         with mss.mss() as sct:
             while self.is_recording:
                 loop_start_time = time.time()
                 try:
-                    capture_area = target_to_record
-                    sct_img = sct.grab(capture_area)
-                    frame_np = np.array(sct_img)
+                    if record_all_screens:
+                        monitors_to_capture = sct.monitors[1:]
+                        combined_frame = np.zeros((height, width, 3), dtype=np.uint8)
+                        current_x_offset = 0
 
-                    if (original_width, original_height) != (width, height):
-                        frame_np_resized = cv2.resize(frame_np, (width, height), interpolation=cv2.INTER_AREA)
-                    else:
-                        frame_np_resized = frame_np
+                        # Define a origem do Desktop Virtual para o cálculo do cursor
+                        virtual_screen_left = sct.monitors[0]['left']
+                        virtual_screen_top = sct.monitors[0]['top']
 
-                    frame_pil = Image.fromarray(cv2.cvtColor(frame_np_resized, cv2.COLOR_BGRA2RGB))
+                        for monitor in monitors_to_capture:
+                            sct_img = sct.grab(monitor)
+                            frame_np = np.array(sct_img)
+                            h_m, w_m, _ = frame_np.shape
 
-                    if cursor_img:
-                        mouse_pos = mouse_controller.position
-                        cursor_x_in_capture = mouse_pos[0] - capture_area['left']
-                        cursor_y_in_capture = mouse_pos[1] - capture_area['top']
-                        scaled_cursor_x = int(cursor_x_in_capture * (width / original_width))
-                        scaled_cursor_y = int(cursor_y_in_capture * (height / original_height))
-                        frame_pil.paste(cursor_img, (scaled_cursor_x, scaled_cursor_y), cursor_img)
+                            # Converte de BGRA para BGR
+                            frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
+                            combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
+                            current_x_offset += w_m
 
-                    self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
+                        final_frame_pil = Image.fromarray(cv2.cvtColor(combined_frame, cv2.COLOR_BGR2RGB))
+
+                        if cursor_img:
+                            mouse_pos = mouse_controller.position
+                            # Coordenadas do cursor relativas ao canto superior esquerdo do desktop virtual
+                            cursor_x = mouse_pos[0] - virtual_screen_left
+                            cursor_y = mouse_pos[1] - virtual_screen_top
+                            final_frame_pil.paste(cursor_img, (cursor_x, cursor_y), cursor_img)
+
+                        self.out.write(cv2.cvtColor(np.array(final_frame_pil), cv2.COLOR_RGB2BGR))
+
+                    else:  # Lógica original para uma única tela
+                        capture_area = target_to_record
+                        sct_img = sct.grab(capture_area)
+                        frame_np = np.array(sct_img)
+
+                        original_width, original_height = target_to_record['width'], target_to_record['height']
+
+                        if (original_width, original_height) != (width, height):
+                            frame_np_resized = cv2.resize(frame_np, (width, height), interpolation=cv2.INTER_AREA)
+                        else:
+                            frame_np_resized = frame_np
+
+                        frame_pil = Image.fromarray(cv2.cvtColor(frame_np_resized, cv2.COLOR_BGRA2RGB))
+
+                        if cursor_img:
+                            mouse_pos = mouse_controller.position
+                            cursor_x_in_capture = mouse_pos[0] - capture_area['left']
+                            cursor_y_in_capture = mouse_pos[1] - capture_area['top']
+                            scaled_cursor_x = int(cursor_x_in_capture * (width / original_width))
+                            scaled_cursor_y = int(cursor_y_in_capture * (height / original_height))
+                            frame_pil.paste(cursor_img, (scaled_cursor_x, scaled_cursor_y), cursor_img)
+
+                        self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
+
                 except Exception as e:
                     print(f"Erro durante o loop de gravação: {e}")
-                    self.is_recording = False
+                    self.state = "idle" # Changed from is_recording = False to avoid race conditions
 
                 sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
                 if sleep_time > 0: time.sleep(sleep_time)
