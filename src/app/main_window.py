@@ -82,7 +82,7 @@ class MainApplication(tk.Frame):
         tk.Frame(self.main_card_frame, height=1, bg="#e0e0e0").pack(fill="x", padx=40, pady=(15,10))
         content_container = tk.Frame(self.main_card_frame, bg=COR_CARD, padx=40, pady=20)
         content_container.pack(expand=True, fill="both")
-        btn1 = tk.Button(content_container, text="INICIAR CAPTURA (F9)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.capture_module.enter_preparation_mode)
+        btn1 = tk.Button(content_container, text="INICIAR CAPTURA (F9)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.capture_module.start_capture_session)
         btn1.pack(pady=(5,10), fill='x')
         btn2 = tk.Button(content_container, text="INICIAR GRAVAÇÃO (F10)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=lambda: self.recording_module.enter_preparation_mode(record_all_screens=self.record_all_screens_var.get()))
         btn2.pack(pady=(5,10), fill='x')
