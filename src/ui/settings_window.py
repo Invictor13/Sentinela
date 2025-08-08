@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Toplevel, filedialog, messagebox
+from tkinter import Toplevel, filedialog, messagebox, ttk
 import os
 
 from ..config.settings import save_app_config
@@ -15,7 +15,7 @@ class SettingsWindow(Toplevel):
         self.on_close_callback = on_close_callback
 
         self.title("Configurações")
-        self.geometry("500x180")
+        self.geometry("500x280")
         self.configure(bg=COR_FUNDO_JANELA)
         self.resizable(False, False)
         self.transient(parent)
@@ -39,10 +39,24 @@ class SettingsWindow(Toplevel):
         browse_button = tk.Button(main_frame, text="Procurar...", command=self.browse_save_path, font=("Segoe UI", 9))
         browse_button.grid(row=3, column=2, padx=(5,0))
 
-        buttons_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
-        buttons_frame.grid(row=4, column=0, columnspan=3, pady=(20,0))
+        # Quality Settings
+        tk.Label(main_frame, text="Qualidade de Gravação:", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).grid(row=4, column=0, sticky="w", pady=(10, 0))
 
-        tk.Button(buttons_frame, text="Salvar Pasta", command=self.save_settings, font=("Segoe UI", 10, "bold")).pack(side="left", padx=10)
+        self.quality_var = tk.StringVar(value=self.app_config.get("RecordingQuality", "high"))
+
+        quality_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
+        quality_frame.grid(row=5, column=0, columnspan=3, sticky="w", padx=20)
+
+        style = ttk.Style()
+        style.configure("TRadiobutton", background=COR_FUNDO_JANELA, foreground=COR_TEXTO_SECUNDARIO)
+
+        ttk.Radiobutton(quality_frame, text="Full HD (MP4) - Ideal para edição e visualização local.", variable=self.quality_var, value="high", style="TRadiobutton").pack(anchor="w")
+        ttk.Radiobutton(quality_frame, text="Web (720p) - Otimizado para compartilhamento rápido.", variable=self.quality_var, value="compact", style="TRadiobutton").pack(anchor="w")
+
+        buttons_frame = tk.Frame(main_frame, bg=COR_FUNDO_JANELA)
+        buttons_frame.grid(row=6, column=0, columnspan=3, pady=(20,0))
+
+        tk.Button(buttons_frame, text="Salvar Configurações", command=self.save_settings, font=("Segoe UI", 10, "bold")).pack(side="left", padx=10)
         tk.Button(buttons_frame, text="Fechar", command=self.destroy, font=("Segoe UI", 10)).pack(side="left", padx=10)
 
         main_frame.columnconfigure(1, weight=1)
@@ -54,6 +68,7 @@ class SettingsWindow(Toplevel):
 
     def save_settings(self):
         new_save_path = self.save_path_var.get()
+        new_quality = self.quality_var.get()
         try:
             os.makedirs(new_save_path, exist_ok=True)
             with open(os.path.join(new_save_path, ".test"), "w") as f:
@@ -63,11 +78,12 @@ class SettingsWindow(Toplevel):
             messagebox.showerror("Erro de Caminho", "Não é possível escrever no caminho.", parent=self)
             return
 
-        save_app_config(self.app_config["config_parser_obj"], new_save_path)
+        save_app_config(self.app_config["config_parser_obj"], new_save_path, new_quality)
         self.app_config["DefaultSaveLocation"] = new_save_path
+        self.app_config["RecordingQuality"] = new_quality
 
         if self.on_close_callback:
             self.on_close_callback(new_save_path)
 
-        messagebox.showinfo("Sucesso", "Configurações de pasta salvas.", parent=self)
+        messagebox.showinfo("Sucesso", "Configurações salvas.", parent=self)
         self.destroy()
