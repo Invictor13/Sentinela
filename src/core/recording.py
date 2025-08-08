@@ -23,169 +23,173 @@ COR_DESTAQUE = "#00b37a"
 COR_TRANSPARENTE = "white"
 
 
-class OverlaySelectionWindow(Toplevel):
-    def __init__(self, parent, recorder_module):
-        super().__init__(parent)
+class ShadowCloakManager:
+    def __init__(self, recorder_module):
         self.recorder_module = recorder_module
         self.sct = mss.mss()
-
-        # Configurações da janela de sobreposição
-        self.configure(bg=COR_TRANSPARENTE)
-        self.wm_attributes("-transparentcolor", COR_TRANSPARENTE)
-        self.wm_attributes("-topmost", True)
-        self.overrideredirect(True)
-
-        # Obter a geometria de todo o desktop virtual
-        total_width = sum(m["width"] for m in self.sct.monitors[1:])
-        min_left = min(m["left"] for m in self.sct.monitors[1:])
-        min_top = min(m["top"] for m in self.sct.monitors[1:])
-        max_height = max(m["height"] for m in self.sct.monitors[1:])
-
-        # A geometria para cobrir tudo pode ser complexa; vamos usar o monitor[0] por enquanto
-        # que geralmente representa o desktop virtual inteiro.
-        desktop = self.sct.monitors[0]
-        self.geometry(f"{desktop['width']}x{desktop['height']}+{desktop['left']}+{desktop['top']}")
-
-        # Canvas para escurecer a tela
-        self.canvas = tk.Canvas(self, bg="#000000", highlightthickness=0)
-        self.wm_attributes("-alpha", 0.5) # Opacidade da janela inteira
-        self.canvas.pack(fill="both", expand=True)
-
+        self.mouse_controller = MouseController()
+        self.overlays = []
+        self.active_overlay = None
+        self.highlighted_window = None
         self.available_windows = []
-        self.active_window = None
-        self.highlight_rect = None
 
-        self.desktop_offset_x = desktop['left']
-        self.desktop_offset_y = desktop['top']
-
+        self._create_overlays()
         self.refresh_window_list()
-        self.canvas.bind("<Motion>", self.on_mouse_move)
-        self.canvas.bind("<Button-1>", self.on_mouse_click)
 
-        # Estado da seleção
-        self.selection_locked = False
-        self.selected_window = None
-        self.quality_var = tk.StringVar(value="high")
-        self.buttons = {}
+    def _create_overlays(self):
+        mouse_pos = self.mouse_controller.position
+        active_monitor = None
+        # O monitor[0] em MSS é o desktop virtual completo, os seguintes são os monitores individuais.
+        monitors = self.sct.monitors[1:]
 
+        for m in monitors:
+            if m['left'] <= mouse_pos[0] < m['left'] + m['width'] and \
+               m['top'] <= mouse_pos[1] < m['top'] + m['height']:
+                active_monitor = m
+                break
+
+        if not active_monitor and monitors:
+            active_monitor = monitors[0]
+
+        for monitor in monitors:
+            is_active = (monitor == active_monitor)
+            overlay = Toplevel(self.recorder_module.root)
+            overlay.overrideredirect(True)
+            overlay.geometry(f"{monitor['width']}x{monitor['height']}+{monitor['left']}+{monitor['top']}")
+            overlay.wm_attributes("-topmost", True)
+
+            if is_active:
+                self.active_overlay = overlay
+                self._setup_active_overlay(overlay, monitor)
+            else:
+                self._setup_inactive_overlay(overlay, monitor)
+
+            self.overlays.append(overlay)
+
+    def _setup_inactive_overlay(self, overlay, monitor):
+        overlay.wm_attributes("-alpha", 0.6)
+        canvas = tk.Canvas(overlay, bg="black", highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        w, h = monitor['width'], monitor['height']
+
+        try:
+            # Efeito de ruído estático
+            tile_size = 128
+            noise = np.random.randint(0, 35, (tile_size, tile_size), dtype=np.uint8)
+            noise_pil = Image.fromarray(noise, 'L')
+            full_img = Image.new('L', (w, h))
+            for y_pos in range(0, h, tile_size):
+                for x_pos in range(0, w, tile_size):
+                    full_img.paste(noise_pil, (x_pos, y_pos))
+
+            noise_tk = ImageTk.PhotoImage(full_img)
+            canvas.create_image(0, 0, image=noise_tk, anchor="nw")
+            overlay.noise_ref = noise_tk
+        except Exception as e:
+            print(f"Falha ao criar efeito de ruído: {e}")
+
+        try:
+            logo_image = Image.open("assets/logo.png")
+            logo_image.thumbnail((150, 150), Image.Resampling.LANCZOS)
+            logo_tk = ImageTk.PhotoImage(logo_image)
+            canvas.create_image(w/2, h/2 - 60, image=logo_tk)
+            overlay.logo_ref = logo_tk
+        except Exception as e:
+            print(f"Não foi possível carregar o logo para a sobreposição: {e}")
+
+        canvas.create_text(w/2, h/2 + 50, text="ESTA TELA NÃO ESTÁ SENDO GRAVADA",
+                            fill="white", font=("Segoe UI", 18, "bold"), justify="center")
+        canvas.create_text(w/2, h/2 + 85, text="A gravação ocorrerá na tela ativa.",
+                            fill="white", font=("Segoe UI", 14), justify="center")
+
+    def _setup_active_overlay(self, overlay, monitor):
+        overlay.wm_attributes("-alpha", 0.5)
+        overlay.wm_attributes("-transparentcolor", "white")
+        overlay.config(bg='white') # Fundo branco que será transparente
+
+        self.active_canvas = tk.Canvas(overlay, bg="white", highlightthickness=0)
+        self.active_canvas.pack(fill="both", expand=True)
+        self.active_canvas.create_rectangle(0, 0, monitor['width'], monitor['height'], fill="black", outline="")
+
+        overlay.bind("<Motion>", self.on_mouse_move)
+
+        self.monitor_offset = {'x': monitor['left'], 'y': monitor['top']}
+        self.highlight_rect = None
+        self.seal_elements = []
 
     def refresh_window_list(self):
         self.available_windows = []
-        seen_titles = set()
-        # Nomes de janelas a serem ignoradas
-        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", self.title()}
+        banned_titles = {"Program Manager", "Windows Input Experience", "Configurações"}
+        for o in self.overlays:
+            banned_titles.add(o.title())
 
-        all_windows = gw.getAllWindows()
-        for window in all_windows:
-            if (window.title and
-                window.visible and
-                not window.isMinimized and
-                window.width > 100 and # Filtrar janelas muito pequenas
-                window.height > 100 and
-                window.title not in seen_titles and
-                window.title not in banned_titles):
+        for window in gw.getAllWindows():
+            if (window.title and window.visible and not window.isMinimized and
+                window.width > 150 and window.height > 150 and window.title not in banned_titles):
                 self.available_windows.append(window)
-                seen_titles.add(window.title)
 
     def on_mouse_move(self, event):
-        # Coordenadas do mouse relativas à tela
-        mouse_x, mouse_y = self.winfo_pointerxy()
+        mouse_x, mouse_y = self.mouse_controller.position
 
         found_window = None
         for window in self.available_windows:
-            if (window.left < mouse_x < window.right and
-                window.top < mouse_y < window.bottom):
+            if window.left < mouse_x < window.right and window.top < mouse_y < window.bottom:
                 found_window = window
                 break
 
-        if found_window and found_window != self.active_window:
-            self.active_window = found_window
-            if self.highlight_rect:
-                self.canvas.delete(self.highlight_rect)
+        if self.highlighted_window != found_window:
+            self.highlighted_window = found_window
+            self._update_highlight()
 
-            # Ajustar coordenadas para o canvas
-            x1 = window.left - self.desktop_offset_x
-            y1 = window.top - self.desktop_offset_y
-            x2 = window.right - self.desktop_offset_x
-            y2 = window.bottom - self.desktop_offset_y
+    def _update_highlight(self):
+        # Limpar destaques e selos antigos do canvas
+        if self.highlight_rect:
+            self.active_canvas.delete(self.highlight_rect)
+            self.highlight_rect = None
+        for item in self.seal_elements:
+            self.active_canvas.delete(item)
+        self.seal_elements = []
 
-            self.highlight_rect = self.canvas.create_rectangle(
-                x1, y1, x2, y2,
-                outline=COR_DESTAQUE, width=4, fill=COR_TRANSPARENTE
-            )
-        elif not found_window and self.active_window:
-            self.active_window = None
-            if self.highlight_rect:
-                self.canvas.delete(self.highlight_rect)
-                self.highlight_rect = None
+        if self.highlighted_window:
+            win = self.highlighted_window
+            # Coordenadas relativas ao monitor ativo
+            x1 = win.left - self.monitor_offset['x']
+            y1 = win.top - self.monitor_offset['y']
+            x2 = win.right - self.monitor_offset['x']
+            y2 = win.bottom - self.monitor_offset['y']
 
-    def on_mouse_click(self, event):
-        if self.selection_locked:
-            # A seleção está travada, verificar clique nos botões
-            mouse_x, mouse_y = event.x, event.y
-            for name, (x1, y1, x2, y2) in self.buttons.items():
-                if x1 < mouse_x < x2 and y1 < mouse_y < y2:
-                    if name == "record":
-                        self.recorder_module.start_recording_mode(self.selected_window, self.quality_var.get())
-                        self.destroy()
-                    elif name == "cancel":
-                        self.destroy()
-                    break
-        elif self.active_window:
-            # Travar a seleção na janela ativa
-            self.selection_locked = True
-            self.selected_window = self.active_window
-            self.canvas.unbind("<Motion>")
-            self._draw_confirmation_controls()
+            self.highlight_rect = self.active_canvas.create_rectangle(
+                x1, y1, x2, y2, outline="#00e676", width=5, fill="")
 
-    def _draw_confirmation_controls(self):
-        # Coordenadas da janela selecionada, ajustadas para o canvas
-        win_x1 = self.selected_window.left - self.desktop_offset_x
-        win_y1 = self.selected_window.top - self.desktop_offset_y
-        win_x2 = self.selected_window.right - self.desktop_offset_x
-        win_y2 = self.selected_window.bottom - self.desktop_offset_y
+            self._draw_pre_confirmation_seal(x1, y1)
 
-        # Posição para os controles (abaixo da janela selecionada)
-        controls_y = win_y2 + 10
-        center_x = (win_x1 + win_x2) / 2
+    def _draw_pre_confirmation_seal(self, x, y):
+        seal_w, seal_h = 280, 55
+        seal_x, seal_y = x + 10, y + 10
 
-        # --- Botão Gravar (desenhado manualmente) ---
-        btn_w, btn_h = 100, 30
-        rec_x1 = center_x - btn_w - 5
-        rec_y1 = controls_y
-        rec_x2 = rec_x1 + btn_w
-        rec_y2 = rec_y1 + btn_h
-        self.canvas.create_rectangle(rec_x1, rec_y1, rec_x2, rec_y2, fill=COR_BOTAO, outline=COR_BOTAO, tags="controls")
-        self.canvas.create_text(rec_x1 + btn_w/2, rec_y1 + btn_h/2, text="Gravar", fill="white", font=("Segoe UI", 10, "bold"), tags="controls")
-        self.buttons["record"] = (rec_x1, rec_y1, rec_x2, rec_y2)
+        rect = self.active_canvas.create_rectangle(
+            seal_x, seal_y, seal_x + seal_w, seal_y + seal_h,
+            fill="black", outline="#333333", width=1)
 
-        # --- Botão Cancelar (desenhado manualmente) ---
-        can_x1 = center_x + 5
-        can_y1 = controls_y
-        can_x2 = can_x1 + btn_w
-        can_y2 = can_y1 + btn_h
-        self.canvas.create_rectangle(can_x1, can_y1, can_x2, can_y2, fill="#a9a9a9", outline="#a9a9a9", tags="controls")
-        self.canvas.create_text(can_x1 + btn_w/2, can_y1 + btn_h/2, text="Cancelar", fill="white", font=("Segoe UI", 10, "bold"), tags="controls")
-        self.buttons["cancel"] = (can_x1, can_y1, can_x2, can_y2)
+        rec_text = self.active_canvas.create_text(
+            seal_x + 30, seal_y + seal_h / 2,
+            text="REC", fill="red", font=("Segoe UI", 14, "bold"))
 
-        # --- Opções de Qualidade (Radio Buttons) ---
-        quality_frame = tk.Frame(self, bg="#333333")
-        style = ttk.Style()
-        style.configure("TFrame", background="#333333")
-        style.configure("TRadiobutton", background="#333333", foreground="white", font=("Segoe UI", 9))
+        msg_text = self.active_canvas.create_text(
+            seal_x + 60, seal_y + seal_h / 2,
+            text="Alvo na mira. Pressione Ctrl+F10\npara INICIAR a gravação.",
+            fill="white", font=("Segoe UI", 9), anchor="w")
 
-        rb_high = ttk.Radiobutton(quality_frame, text="Alta Qualidade", variable=self.quality_var, value="high", style="TRadiobutton")
-        rb_compact = ttk.Radiobutton(quality_frame, text="Compacta", variable=self.quality_var, value="compact", style="TRadiobutton")
-        rb_high.pack(side="left", padx=5)
-        rb_compact.pack(side="left", padx=5)
+        self.seal_elements.extend([rect, rec_text, msg_text])
 
-        self.canvas.create_window(center_x, controls_y + btn_h + 20, window=quality_frame, tags="controls")
+    def get_highlighted_window(self):
+        return self.highlighted_window
 
     def destroy(self):
-        # Garantir que a janela principal reapareça
-        if self.recorder_module:
-            self.recorder_module.root.deiconify()
-        super().destroy()
+        for overlay in self.overlays:
+            overlay.destroy()
+        self.overlays = []
 
 
 class ScreenRecordingModule:
@@ -193,21 +197,40 @@ class ScreenRecordingModule:
         self.root = root
         self.save_path = save_path
         self.is_recording = False
+        self.selection_in_progress = False
         self.out = None
         self.start_time = None
-        self.selection_window = None
+        self.selection_manager = None
         self.recording_indicator = RecordingIndicator(self.root, self)
         self.sct = mss.mss()
         self.thread_gravacao = None
 
     def open_recording_selection_ui(self):
-        if self.is_recording or (self.selection_window and self.selection_window.winfo_exists()):
+        if self.is_recording or self.selection_in_progress:
             return
 
+        self.selection_in_progress = True
         self.root.withdraw()
-        self.selection_window = OverlaySelectionWindow(self.root, self)
+        self.selection_manager = ShadowCloakManager(self)
+
+    def confirm_recording_selection(self):
+        if not self.selection_in_progress or not self.selection_manager:
+            return
+
+        target_window = self.selection_manager.get_highlighted_window()
+
+        if target_window:
+            self.selection_manager.destroy()
+            self.selection_manager = None
+            # O padrão de qualidade será 'high' por enquanto, conforme o novo fluxo não pede input.
+            self.start_recording_mode(target_window, "high")
+        else:
+            # Opcional: Adicionar um feedback sonoro ou visual de que nenhuma janela foi selecionada.
+            print("Tentativa de confirmação de gravação sem uma janela em foco.")
+
 
     def start_recording_mode(self, target_to_record, quality_profile):
+        self.selection_in_progress = False
         # Adicionar uma pequena pausa para a janela de overlay fechar
         time.sleep(0.2)
 

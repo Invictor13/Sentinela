@@ -81,9 +81,9 @@ class MainApplication(tk.Frame):
         tk.Frame(self.main_card_frame, height=1, bg="#e0e0e0").pack(fill="x", padx=40, pady=(15,10))
         content_container = tk.Frame(self.main_card_frame, bg=COR_CARD, padx=40, pady=20)
         content_container.pack(expand=True, fill="both")
-        btn1 = tk.Button(content_container, text="INICIAR CAPTURA (Ctrl+Shift+F9)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.capture_module.start_capture_mode)
+        btn1 = tk.Button(content_container, text="INICIAR CAPTURA (Ctrl+F9)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.capture_module.start_capture_mode)
         btn1.pack(pady=(5,10), fill='x')
-        btn2 = tk.Button(content_container, text="INICIAR GRAVAÇÃO (Ctrl+Shift+F10)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.recording_module.open_recording_selection_ui)
+        btn2 = tk.Button(content_container, text="INICIAR GRAVAÇÃO (Ctrl+F10)", font=("Segoe UI", 10, "bold"), bg=COR_BOTAO, fg="white", relief=tk.FLAT, padx=20, pady=8, command=self.recording_module.open_recording_selection_ui)
         btn2.pack(pady=(5,10), fill='x')
         for btn in [btn1, btn2]:
             btn.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
