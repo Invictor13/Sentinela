@@ -40,16 +40,16 @@ O Sentinela é uma ferramenta de captura de evidências simples e segura, projet
 
 O projeto segue uma arquitetura modular para facilitar a manutenção e o desenvolvimento futuro, com responsabilidades separadas para UI, lógica de núcleo e configuração.
 
-/Sentinela
-/src
-/app
-/core
-/config
-/ui
-/assets
-main.py
-requirements.txt
-README.md
+- /Sentinela
+- /src
+- /app
+- /core
+- /config
+- /ui
+- /assets
+- main.py
+- requirements.txt
+- README.md
 
 
 ---
