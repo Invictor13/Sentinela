@@ -5,3 +5,4 @@ pynput
 pygetwindow
 mss
 pystray
+pywin32

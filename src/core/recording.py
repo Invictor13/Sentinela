@@ -5,9 +5,10 @@ from datetime import datetime
 import cv2
 import mss
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageTk
 from pynput.mouse import Controller as MouseController
-import pygetwindow as gw
+import win32gui
+import win32con
 import tkinter as tk
 from tkinter import Toplevel, Listbox, END, SINGLE, ttk, messagebox
 
@@ -105,23 +106,20 @@ class ScreenRecordingModule:
         self.window_listbox.delete(0, END)
         self.available_windows = []
         seen_titles = set()
+        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", "Opção de Gravação", "Sentinela Unimed"}
 
-        banned_titles = {"Program Manager", "Experiência de entrada do Windows", "Configurações", "Opção de Gravação"}
+        def _enum_windows_callback(hwnd, lParam):
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if title and title not in seen_titles and title not in banned_titles:
+                    if win32gui.GetParent(hwnd) == 0:
+                        ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+                        if ex_style & win32con.WS_EX_APPWINDOW:
+                            self.available_windows.append({'title': title, 'hwnd': hwnd})
+                            self.window_listbox.insert(END, title)
+                            seen_titles.add(title)
 
-        all_windows = gw.getAllWindows()
-        for window in all_windows:
-            if (window.title and
-                not window.title.startswith("IDLE Shell") and
-                window.visible and
-                not window.isMinimized and
-                window.width > 10 and
-                window.height > 10 and
-                window.title not in seen_titles and
-                window.title not in banned_titles):
-
-                self.available_windows.append(window)
-                self.window_listbox.insert(END, window.title)
-                seen_titles.add(window.title)
+        win32gui.EnumWindows(_enum_windows_callback, None)
 
     def on_monitor_select(self, event):
         self.window_listbox.selection_clear(0, END)
@@ -138,13 +136,25 @@ class ScreenRecordingModule:
         try:
             self.monitor_var.set('')
             selected_index = self.window_listbox.curselection()[0]
-            selected_title = self.window_listbox.get(selected_index)
             self.start_button.config(state=tk.DISABLED)
-            target_window = next((w for w in self.available_windows if w.title == selected_title), None)
-            if target_window:
-                self.selected_window_obj = target_window
-                self.selected_area = {"top": target_window.top, "left": target_window.left, "width": target_window.width, "height": target_window.height}
-                self.update_static_preview()
+
+            target_window_info = self.available_windows[selected_index]
+            if target_window_info:
+                hwnd = target_window_info['hwnd']
+                try:
+                    rect = win32gui.GetWindowRect(hwnd)
+                    left, top, right, bottom = rect
+                    width, height = right - left, bottom - top
+
+                    if width > 0 and height > 0:
+                        self.selected_window_obj = {
+                            'title': target_window_info['title'], 'hwnd': hwnd,
+                            'top': top, 'left': left, 'width': width, 'height': height
+                        }
+                        self.selected_area = {"top": top, "left": left, "width": width, "height": height}
+                        self.update_static_preview()
+                except win32gui.error:
+                    self.refresh_window_list()
         except IndexError:
             pass
 
@@ -180,7 +190,7 @@ class ScreenRecordingModule:
         quality_profile = self.quality_var.get()
         if self.selected_window_obj:
             try:
-                self.selected_window_obj.activate()
+                win32gui.SetForegroundWindow(self.selected_window_obj['hwnd'])
                 time.sleep(0.3)
             except Exception:
                 pass
@@ -212,10 +222,10 @@ class ScreenRecordingModule:
         self.root.deiconify()
 
     def recording_thread(self, target_to_record, quality_profile):
-        is_window_recording = hasattr(target_to_record, 'title')
+        is_window_recording = 'hwnd' in target_to_record
 
         if is_window_recording:
-            original_width, original_height = target_to_record.width, target_to_record.height
+            original_width, original_height = target_to_record['width'], target_to_record['height']
         else:
             original_width, original_height = target_to_record['width'], target_to_record['height']
 
