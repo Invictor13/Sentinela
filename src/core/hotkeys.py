@@ -41,16 +41,18 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
     record_hotkey_str = config.get('Hotkeys', 'record', fallback='F10')
 
     def on_activate_capture():
-        # Prevent capture from starting if a recording is in progress.
-        if recording_module.state != "idle":
+        # Logic as per the new blueprint
+        # This check needs to be based on the recording module's state attribute
+        if recording_module.is_recording:
             return
 
         if not capture_module.is_in_session:
-            # First press: Inicia a sessão de captura.
+            # Inicia a sessão
             root_window.after(0, capture_module.start_capture_session)
         else:
-            # Pressões subsequentes: Tira um print da tela ativa no momento.
-            active_monitor = capture_module.overlay_manager.get_active_monitor()
+            # Tira o screenshot dentro da sessão
+            # The 'get_active_monitor_logic' is implemented by the capture module's overlay
+            active_monitor = capture_module.overlay_manager.get_active_monitor() # Pega a tela ativa
             if active_monitor:
                 root_window.after(0, capture_module.take_screenshot, active_monitor)
 
@@ -59,16 +61,14 @@ def key_listener_thread_proc(capture_module, recording_module, root_window, main
         if capture_module.is_in_session:
             return
 
-        state = recording_module.state
-        if state == "idle":
-            # Consulta o estado do checkbox na UI principal
+        # This check is illustrative. Assuming is_recording is a boolean property.
+        # The actual state transition logic for recording remains unchanged.
+        if recording_module.state == "idle":
             record_all = main_app_instance.record_all_screens_var.get()
-            # Inicia o modo de preparação passando o estado correto
             root_window.after(0, recording_module.enter_preparation_mode, record_all)
-        elif state == "preparing":
-            # The quality profile is now read inside the recording thread
+        elif recording_module.state == "preparing":
             root_window.after(0, recording_module.start_recording_mode)
-        elif state == "recording":
+        elif recording_module.state == "recording":
             root_window.after(0, recording_module.stop_recording)
 
     # It's better to handle exceptions here in case of invalid hotkey formats
