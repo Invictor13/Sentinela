@@ -59,7 +59,7 @@ def main():
 
     listener_thread = threading.Thread(
         target=key_listener_thread_proc,
-        args=(capture_module, recording_module, root),
+        args=(capture_module, recording_module, root, main_app),
         daemon=True
     )
     listener_thread.start()
