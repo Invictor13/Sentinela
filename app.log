@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/app/src/main.py", line 8, in <module>
+    from .core.recording import ScreenRecordingModule
+  File "/app/src/core/recording.py", line 9, in <module>
+    from pynput.mouse import Controller as MouseController
+  File "/home/jules/.pyenv/versions/3.12.11/lib/python3.12/site-packages/pynput/__init__.py", line 40, in <module>
+    from . import keyboard
+  File "/home/jules/.pyenv/versions/3.12.11/lib/python3.12/site-packages/pynput/keyboard/__init__.py", line 31, in <module>
+    backend = backend(__name__)
+              ^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.11/lib/python3.12/site-packages/pynput/_util/__init__.py", line 78, in backend
+    raise ImportError('this platform is not supported: {}'.format(
+ImportError: this platform is not supported: ('failed to acquire X connection: Bad display name ""', DisplayNameError(''))
+
+Try one of the following resolutions:
+
+ * Please make sure that you have an X server running, and that the DISPLAY environment variable is set correctly
