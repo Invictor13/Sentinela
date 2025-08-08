@@ -147,6 +147,7 @@ class ScreenCaptureModule:
             show_success_dialog(
                 self.root,
                 f"{len(self.screenshots)} captura(s) salva(s) com sucesso!",
+                session_save_path,
                 session_save_path
             )
         finally:
