@@ -36,10 +36,12 @@ class ScreenCaptureModule:
 
     def start_capture_session(self):
         """ Starts the capture session, showing overlays and the initial command bar. """
+        # Defensive: Ensure the session starts clean.
+        self.screenshots = []
+
         if self.is_in_session:
             return
 
-        self.screenshots = []
         self.is_in_session = True
 
         # This part handles displaying overlays on all screens
@@ -180,5 +182,5 @@ class ScreenCaptureModule:
                 session_save_path
             )
         finally:
-            # Ensure the list is cleared
-            self.screenshots = []
+            # Defensive: Ensure the list is cleared to prevent memory leaks or state carry-over.
+            self.screenshots.clear()

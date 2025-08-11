@@ -55,6 +55,14 @@ class CaptureIndicator(Toplevel):
 
     def show_preparation_mode(self, monitor_info, text):
         """Exibe o indicador em um modo de preparação na tela especificada."""
+        # Defensive: Reset the counter label if it exists, to avoid showing stale data.
+        if self.counter_label.winfo_exists():
+            self.counter_label.config(text="Total de Capturas: 0")
+            # Also, reset the UI to its initial state
+            self.counter_label.pack_forget()
+            self.end_button.pack_forget()
+            self.instruction_label.pack(side="left", padx=(0, 15))
+
         self.instruction_label.config(text=text) # Reutiliza o label de instrução para o modo de preparação
         self.update_idletasks()
 
