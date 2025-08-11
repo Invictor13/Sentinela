@@ -41,12 +41,11 @@ class ScreenCaptureModule:
         self.overlay_manager = PreparationOverlayManager(self.root, self.capture_indicator, "Pressione F9 para capturar a tela ativa")
         self.overlay_manager.start()
 
-    def take_screenshot(self):
+    def take_screenshot(self, active_monitor):
         """Tira um screenshot da tela ativa e comanda a atualização do indicador."""
         if not self.is_in_session:
             return
 
-        active_monitor = self.overlay_manager.get_active_monitor()
         if not active_monitor:
             return
 
