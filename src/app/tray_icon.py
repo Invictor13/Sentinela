@@ -3,7 +3,7 @@ from pystray import MenuItem as item, Icon as icon, Menu
 from PIL import Image
 import os
 
-from src.main import resource_path
+from src.utils import resource_path
 
 def setup_tray_icon(root, capture_module, recording_module, app_config):
 

@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import messagebox
 import configparser
 from src.config.settings import CONFIG_FILE
-from src.main import resource_path
+from src.utils import resource_path
 
 from src.ui.preparation_indicator import PreparationIndicator
 from src.ui.dialogs import show_success_dialog
