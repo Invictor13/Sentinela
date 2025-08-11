@@ -3,12 +3,7 @@ from pystray import MenuItem as item, Icon as icon, Menu
 from PIL import Image
 import os
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, "assets", relative_path)
+from src.main import resource_path
 
 def setup_tray_icon(root, capture_module, recording_module, app_config):
 

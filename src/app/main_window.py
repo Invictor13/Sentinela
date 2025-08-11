@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 
+from src.main import resource_path
 from src.ui.settings_window import SettingsWindow
 
 COR_FUNDO_JANELA = "#f0f5f0"
@@ -17,13 +18,6 @@ COR_BOTAO_HOVER = "#007a4a"
 COR_BOTAO_SECUNDARIO = "#7f8c8d"
 COR_BOTAO_SECUNDARIO_HOVER = "#6c7a7d"
 PALETA_BOLHAS = ["#00b37a", "#00a36e", "#00995d", "#008f5d", "#007a4a"]
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    return os.path.join(base_path, "assets", relative_path)
 
 class Bubble:
     def __init__(self, canvas, width, height):
