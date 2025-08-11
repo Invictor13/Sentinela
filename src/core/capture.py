@@ -39,8 +39,8 @@ class ScreenCaptureModule:
         if self.is_in_session:
             return
 
-        self.is_in_session = True
         self.screenshots = []
+        self.is_in_session = True
 
         # This part handles displaying overlays on all screens
         self.overlay_manager = PreparationOverlayManager(
