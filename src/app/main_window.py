@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from src.main import resource_path
+from src.utils import resource_path
 from src.ui.settings_window import SettingsWindow
 
 COR_FUNDO_JANELA = "#f0f5f0"

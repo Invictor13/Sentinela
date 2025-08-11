@@ -26,13 +26,7 @@ from src.core.hotkeys import key_listener_thread_proc
 from src.app.tray_icon import setup_tray_icon
 from src.config.settings import load_app_config
 from src.ui.settings_window import SettingsWindow
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(base_path, "assets", relative_path)
+from src.utils import resource_path
 
 def main():
     try:

@@ -4,7 +4,7 @@ import mss
 import numpy as np
 from PIL import Image, ImageTk
 from pynput.mouse import Controller as MouseController
-from src.main import resource_path
+from src.utils import resource_path
 
 class PreparationOverlayManager:
     """
