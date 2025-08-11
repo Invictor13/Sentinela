@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import messagebox
 import configparser
 from src.config.settings import CONFIG_FILE
+from src.main import resource_path
 
 from src.ui.preparation_indicator import PreparationIndicator
 from src.ui.dialogs import show_success_dialog
@@ -118,7 +119,7 @@ class ScreenRecordingModule:
         filename = os.path.join(self.save_path, f"Evidencia_Gravacao_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4")
 
         try:
-            cursor_img = Image.open("assets/cursor.png").convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
+            cursor_img = Image.open(resource_path("cursor.png")).convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
         except FileNotFoundError:
             cursor_img = None
 

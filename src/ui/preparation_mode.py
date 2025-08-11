@@ -4,6 +4,7 @@ import mss
 import numpy as np
 from PIL import Image, ImageTk
 from pynput.mouse import Controller as MouseController
+from src.main import resource_path
 
 class PreparationOverlayManager:
     """
@@ -12,12 +13,12 @@ class PreparationOverlayManager:
     switching between monitors, and showing a readiness indicator on the
     active screen.
     """
-    def __init__(self, root, indicator, indicator_text, inactive_text="This screen will not be used.", logo_path="assets/logo.png"):
+    def __init__(self, root, indicator, indicator_text, inactive_text="This screen will not be used.", logo_path=None):
         self.root = root
         self.indicator = indicator
         self.indicator_text = indicator_text
         self.inactive_text = inactive_text
-        self.logo_path = logo_path
+        self.logo_path = logo_path if logo_path is not None else resource_path("logo.png")
 
         self.sct = mss.mss()
         self.overlays = {}
