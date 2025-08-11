@@ -1,6 +1,6 @@
 import configparser
 from pynput import keyboard
-from ..config.settings import CONFIG_FILE
+from src.config.settings import CONFIG_FILE
 
 def parse_hotkey_string(hotkey_string):
     """

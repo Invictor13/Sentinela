@@ -3,7 +3,7 @@ from tkinter import Toplevel, filedialog, messagebox, ttk
 import os
 from tkinter import font as tkfont
 
-from ..config.settings import save_app_config
+from src.config.settings import save_app_config
 
 COR_FUNDO_JANELA = "#f0f5f0"
 COR_TEXTO_PRINCIPAL = "#005a36"
