@@ -177,6 +177,9 @@ class ScreenRecordingModule:
             self.root.after(0, self.stop_recording)
             return
 
+        # ANTES do loop, garanta que o indicador esteja visível.
+        self.indicator.deiconify()
+
         with mss.mss() as sct:
             while self.is_recording:
                 loop_start_time = time.time()
@@ -188,18 +191,13 @@ class ScreenRecordingModule:
                         virtual_screen_left = sct.monitors[0]['left']
                         virtual_screen_top = sct.monitors[0]['top']
 
-                        try:
-                            self.indicator.withdraw()
-                            time.sleep(0.01)
-                            for monitor in monitors_to_capture:
-                                sct_img = sct.grab(monitor)
-                                frame_np = np.array(sct_img)
-                                h_m, w_m, _ = frame_np.shape
-                                frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
-                                combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
-                                current_x_offset += w_m
-                        finally:
-                            self.indicator.deiconify()
+                        for monitor in monitors_to_capture:
+                            sct_img = sct.grab(monitor)
+                            frame_np = np.array(sct_img)
+                            h_m, w_m, _ = frame_np.shape
+                            frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
+                            combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
+                            current_x_offset += w_m
 
                         final_frame_pil = Image.fromarray(cv2.cvtColor(combined_frame, cv2.COLOR_BGR2RGB))
                         if cursor_img:
@@ -211,12 +209,7 @@ class ScreenRecordingModule:
                     else:
                         capture_area = target_to_record
 
-                        try:
-                            self.indicator.withdraw()
-                            time.sleep(0.01)
-                            sct_img = sct.grab(capture_area)
-                        finally:
-                            self.indicator.deiconify()
+                        sct_img = sct.grab(capture_area)
 
                         frame_np = np.array(sct_img)
                         original_width, original_height = target_to_record['width'], target_to_record['height']
@@ -241,6 +234,8 @@ class ScreenRecordingModule:
                 sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
                 if sleep_time > 0: time.sleep(sleep_time)
 
+        # DEPOIS do loop, esconda o indicador
+        self.indicator.hide()
         if self.out: self.out.release()
         def finalize_on_main_thread():
             if os.path.exists(filename) and os.path.getsize(filename) > 0:
