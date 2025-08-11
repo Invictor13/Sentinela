@@ -1,15 +1,31 @@
+import sys
+import os
+
+# Este é o Feitiço de Autoconhecimento.
+# Ele adiciona a pasta raiz do projeto ao caminho do Python,
+# permitindo que o executável encontre seus próprios módulos.
+if getattr(sys, 'frozen', False):
+    # Se estiver rodando como um executável compilado pelo PyInstaller
+    project_root = os.path.dirname(sys.executable)
+else:
+    # Se estiver rodando como um script normal
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+
+# Adiciona a raiz ao início do caminho de busca de módulos
+sys.path.insert(0, project_root)
+
+# --- O RESTANTE DOS IMPORTS VEM DEPOIS DESTE BLOCO ---
+# Exemplo: from src.app.main_window import MainApplication
 import tkinter as tk
 import threading
 import ctypes
-import os
-import sys
-from .app.main_window import MainApplication
-from .core.capture import ScreenCaptureModule
-from .core.recording import ScreenRecordingModule
-from .core.hotkeys import key_listener_thread_proc
-from .app.tray_icon import setup_tray_icon
-from .config.settings import load_app_config
-from .ui.settings_window import SettingsWindow
+from src.app.main_window import MainApplication
+from src.core.capture import ScreenCaptureModule
+from src.core.recording import ScreenRecordingModule
+from src.core.hotkeys import key_listener_thread_proc
+from src.app.tray_icon import setup_tray_icon
+from src.config.settings import load_app_config
+from src.ui.settings_window import SettingsWindow
 
 def resource_path(relative_path):
     try:

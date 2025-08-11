@@ -10,11 +10,11 @@ from pynput.mouse import Controller as MouseController
 import tkinter as tk
 from tkinter import messagebox
 import configparser
-from ..config.settings import CONFIG_FILE
+from src.config.settings import CONFIG_FILE
 
-from ..ui.preparation_indicator import PreparationIndicator
-from ..ui.dialogs import show_success_dialog
-from ..ui.preparation_mode import PreparationOverlayManager
+from src.ui.preparation_indicator import PreparationIndicator
+from src.ui.dialogs import show_success_dialog
+from src.ui.preparation_mode import PreparationOverlayManager
 
 
 class ScreenRecordingModule:

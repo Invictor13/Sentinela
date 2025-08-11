@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from ..ui.settings_window import SettingsWindow
+from src.ui.settings_window import SettingsWindow
 
 COR_FUNDO_JANELA = "#f0f5f0"
 COR_CARD = "#ffffff"

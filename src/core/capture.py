@@ -7,9 +7,9 @@ from tkinter import simpledialog
 import re
 
 # Assuming these are the correct locations from the original file
-from ..ui.preparation_mode import PreparationOverlayManager
-from ..ui.dialogs import show_success_dialog
-from ..ui.capture_indicator import CaptureIndicator
+from src.ui.preparation_mode import PreparationOverlayManager
+from src.ui.dialogs import show_success_dialog
+from src.ui.capture_indicator import CaptureIndicator
 
 def is_valid_foldername(name):
     """ Helper function to validate folder names. """
