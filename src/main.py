@@ -53,10 +53,19 @@ def main():
 
     # --- First Run Check ---
     if not app_config.get("HasRunBefore", False):
-        # This blocks until the window is closed
         settings_window = SettingsWindow(root, app_config, is_first_run=True)
+
+        # O Feitiço de Centralização
+        settings_window.update_idletasks()
+        screen_width = settings_window.winfo_screenwidth()
+        screen_height = settings_window.winfo_screenheight()
+        window_width = settings_window.winfo_width()
+        window_height = settings_window.winfo_height()
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        settings_window.geometry(f'{window_width}x{window_height}+{x}+{y}')
+
         root.wait_window(settings_window)
-        # The config object in memory might have been updated, so we get the latest save_path
         save_path = app_config["DefaultSaveLocation"]
 
 

@@ -11,17 +11,36 @@ class CaptureIndicator(Toplevel):
         self.overrideredirect(True)
         self.wm_attributes("-topmost", True)
         self.configure(bg='#2b2b2b')
+
         container = tk.Frame(self, bg=self.cget('bg'))
         container.pack(padx=10, pady=5)
-        self.count_label = tk.Label(container, text="Capturas: 0", font=("Segoe UI", 12, "bold"), fg="white", bg=self.cget('bg'))
-        self.count_label.pack(side="left", padx=(0,15))
-        info_label = tk.Label(container, text="Pressione Shift+F9 para capturar", font=("Segoe UI", 10), fg="#cccccc", bg=self.cget('bg'))
-        info_label.pack(side="left", padx=(0,15))
-        self.stop_button = tk.Button(container, text="CONCLUIR", font=("Segoe UI", 9, "bold"), fg="white", bg=COR_BOTAO, relief="flat", command=self.capture_module.end_capture_session, bd=0, padx=10, pady=2)
-        self.stop_button.pack(side="left")
-        self.stop_button.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
-        self.stop_button.bind("<Leave>", lambda e: e.widget.config(bg=COR_BOTAO))
+
+        # --- Widgets Dinâmicos ---
+        # 1. Rótulo de instrução inicial (visível por padrão)
+        self.instruction_label = tk.Label(container, text="Pressione F9 para capturar a Tela Ativa", font=("Segoe UI", 10), fg="#cccccc", bg=self.cget('bg'))
+        self.instruction_label.pack(side="left", padx=(0, 15))
+
+        # 2. Rótulo do contador (inicialmente oculto)
+        self.counter_label = tk.Label(container, font=("Segoe UI", 12, "bold"), fg="white", bg=self.cget('bg'))
+
+        # 3. Botão de encerrar (inicialmente oculto)
+        self.end_button = tk.Button(container, text="Encerrar", font=("Segoe UI", 9, "bold"), fg="white", bg=COR_BOTAO, relief="flat", command=self.capture_module.end_capture_session, bd=0, padx=10, pady=2)
+        self.end_button.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
+        self.end_button.bind("<Leave>", lambda e: e.widget.config(bg=COR_BOTAO))
+
         self.withdraw()
+
+    def update_session_view(self, count):
+        """Atualiza a UI do indicador com base no número de capturas."""
+        if count == 1:
+            # Primeira captura: transforma a UI
+            self.instruction_label.pack_forget()
+            self.counter_label.pack(side="left", padx=(0, 15))
+            self.end_button.pack(side="left")
+
+        # Atualiza o texto do contador em todas as chamadas
+        self.counter_label.config(text=f"Total de Capturas: {count}")
+
 
     def show(self):
         self.update_idletasks()
@@ -34,13 +53,9 @@ class CaptureIndicator(Toplevel):
     def hide(self):
         self.withdraw()
 
-    def update_count(self, count):
-        self.count_label.config(text=f"Capturas: {count}")
-
     def show_preparation_mode(self, monitor_info, text):
         """Exibe o indicador em um modo de preparação na tela especificada."""
-        self.count_label.config(text=text) # Usa o texto dinâmico
-        self.stop_button.pack_forget() # Esconde o botão "CONCLUIR" que não faz sentido aqui
+        self.instruction_label.config(text=text) # Reutiliza o label de instrução para o modo de preparação
         self.update_idletasks()
 
         # Posiciona a janela no canto superior direito do monitor ativo
@@ -58,6 +73,5 @@ class CaptureIndicator(Toplevel):
         self.after(200, lambda: self.configure(bg=original_color))
 
     def hide_preparation_mode(self):
-        """Esconde o indicador e restaura o botão 'CONCLUIR' para uso futuro."""
+        """Esconde o indicador de preparação."""
         self.withdraw()
-        self.stop_button.pack(side="left") # Garante que o botão esteja visível na próxima vez que o modo normal for usado

@@ -103,6 +103,7 @@ class ScreenCaptureModule:
 
         # Third Block: Add image to list and update counter
         self.screenshots.append(img)
+        self.capture_indicator.update_session_view(len(self.screenshots))
         # The label is guaranteed to exist after the first block
         self.session_counter_label.config(text=f"Total de Capturas: {len(self.screenshots)}")
 
