@@ -17,7 +17,7 @@ class CaptureIndicator(Toplevel):
         self.count_label.pack(side="left", padx=(0,15))
         info_label = tk.Label(container, text="Pressione Shift+F9 para capturar", font=("Segoe UI", 10), fg="#cccccc", bg=self.cget('bg'))
         info_label.pack(side="left", padx=(0,15))
-        stop_button = tk.Button(container, text="CONCLUIR", font=("Segoe UI", 9, "bold"), fg="white", bg=COR_BOTAO, relief="flat", command=self.capture_module.stop_capture_mode, bd=0, padx=10, pady=2)
+        stop_button = tk.Button(container, text="CONCLUIR", font=("Segoe UI", 9, "bold"), fg="white", bg=COR_BOTAO, relief="flat", command=self.capture_module.end_capture_session, bd=0, padx=10, pady=2)
         stop_button.pack(side="left")
         stop_button.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
         stop_button.bind("<Leave>", lambda e: e.widget.config(bg=COR_BOTAO))
