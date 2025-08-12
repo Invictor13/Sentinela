@@ -5,6 +5,17 @@ CONFIG_FILE = "config.ini"
 USER_DOCUMENTS_PATH = os.path.join(os.path.expanduser("~"), "Documents")
 DEFAULT_SAVE_LOCATION_FALLBACK = os.path.join(USER_DOCUMENTS_PATH, "SentinelaEvidencias")
 
+# PALETA DE CORES DO SENTINELA
+COR_BOTAO = "#00995D"
+COR_BOTAO_HOVER = "#007a4a"
+COR_FUNDO_JANELA = "#f0f5f0"
+COR_CARD = "#ffffff"
+COR_TEXTO_PRINCIPAL = "#005a36"
+COR_TEXTO_SECUNDARIO = "#555555"
+COR_BOTAO_SECUNDARIO = "#7f8c8d"
+COR_BOTAO_SECUNDARIO_HOVER = "#6c7a7d"
+PALETA_BOLHAS = ["#00b37a", "#00a36e", "#00995d", "#008f5d", "#007a4a"]
+
 def load_app_config():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
