@@ -100,8 +100,8 @@ class ScreenRecordingModule:
 
         # --- 2. CASCATA DE CONTINGÊNCIA DE CODECS ---
         
-        config = self.app_config
-        quality_profile = config.get('Recording', 'quality', fallback='high')
+        config_parser = self.app_config["config_parser_obj"]
+        quality_profile = config_parser.get('Recording', 'quality', fallback='high')
         
         if quality_profile == 'high':
             rec_fps = 15.0

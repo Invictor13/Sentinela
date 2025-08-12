@@ -32,8 +32,8 @@ class ScreenCaptureModule:
         self.is_in_session = True
         
         # Cria e inicia o gerenciador de sobreposição, passando a si mesmo como módulo de controle
-        self.overlay_manager = PreparationOverlayManager(self.root, self.indicator, self)
-        self.overlay_manager.start_capture()
+        self.overlay_manager = PreparationOverlayManager(self.root, self.indicator, "Take Screenshot (F1)", "Recording will start on this screen.")
+        self.overlay_manager.start()
 
     def take_screenshot(self):
         """Tira um screenshot da tela ativa, adiciona à lista e comanda a atualização do indicador."""
@@ -81,7 +81,8 @@ class ScreenCaptureModule:
                 parent=self.root
             )
             
-            save_path = self.app_config.get('Paths', 'DefaultSaveLocation')
+            config_parser = self.app_config["config_parser_obj"]
+            save_path = config_parser.get('Paths', 'DefaultSaveLocation')
             base_folder_name = folder_name_input if folder_name_input and is_valid_foldername(folder_name_input) else f"Evidencias_Captura_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
             
             session_save_path = os.path.join(save_path, base_folder_name)
