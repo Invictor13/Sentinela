@@ -61,23 +61,6 @@ def main():
         settings_window.grab_set()
         root.wait_window(settings_window)
 
-    # --- FIM DO RITO DE PASSAGEM ---
-
-    # 4. Forjam-se os módulos principais, passando o mapa completo.
-    capture_module = ScreenCaptureModule(root, app_config)
-    recording_module = ScreenRecordingModule(root, app_config)
-
-    # 5. Constrói-se a aplicação principal (que permanecerá oculta, se desejado).
-    main_app = MainApplication(root, capture_module, recording_module)
-    main_app.pack(side="top", fill="both", expand=True)
-
-    # ... (Resto do seu código para criar a thread do listener e o ícone da bandeja) ...
-    # Exemplo:
-    # listener_thread = threading.Thread(...)
-    # listener_thread.start()
-    # tray_icon = setup_tray_icon(...)
-    # tray_icon.run_in_thread()
-
     root.mainloop()
 
 if __name__ == "__main__":
