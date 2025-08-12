@@ -38,3 +38,29 @@ def show_success_dialog(root, message, folder_path, specific_path_to_copy):
     close_button.focus_set()
 
     dialog.after(7000, dialog.destroy)
+
+
+import mss
+
+def trigger_flash_animation(parent_window):
+    """Cria um breve flash branco na tela inteira para feedback visual."""
+    flash_window = Toplevel(parent_window)
+    flash_window.overrideredirect(True)
+    flash_window.attributes('-topmost', True)
+
+    try:
+        # Pega as dimensões do monitor principal
+        with mss.mss() as sct:
+            monitor_dims = sct.monitors[1]
+    except IndexError:
+        # Fallback para caso de apenas um monitor
+        with mss.mss() as sct:
+            monitor_dims = sct.monitors[0]
+
+    flash_window.geometry(f"{monitor_dims['width']}x{monitor_dims['height']}+{monitor_dims['left']}+{monitor_dims['top']}")
+    flash_window.attributes('-alpha', 0.0) # Começa invisível
+    flash_window.configure(bg='white')
+
+    # Animação de fade-in e fade-out
+    flash_window.attributes('-alpha', 0.4) # Aparece
+    flash_window.after(150, lambda: flash_window.destroy()) # Desaparece após 150ms
