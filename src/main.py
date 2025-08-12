@@ -99,6 +99,7 @@ def main():
     )
     tray_thread.start()
 
+    root.deiconify()  # Re-exibe a janela principal antes do loop
     root.mainloop()
 
 if __name__ == "__main__":
