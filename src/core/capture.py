@@ -8,9 +8,8 @@ import re
 
 # Assuming these are the correct locations from the original file
 from src.ui.preparation_mode import PreparationOverlayManager
-from src.ui.dialogs import show_success_dialog
+from src.ui.dialogs import show_success_dialog, trigger_flash_animation
 from src.ui.capture_indicator import CaptureIndicator
-from ..ui.dialogs import trigger_flash_animation
 
 def is_valid_foldername(name):
     """ Helper function to validate folder names. """
