@@ -35,11 +35,14 @@ class ScreenCaptureModule:
         self.end_session_button = None
 
     def start_capture_session(self):
-        """ Starts the capture session, showing overlays and the initial command bar. """
+        """Inicia uma nova sessão de captura, limpando qualquer estado anterior."""
+
+        # O FEITIÇO DO RECOMEÇO LIMPO
+        # Garante que a lista de troféus da caçada anterior seja esvaziada.
+        self.screenshots = []
+
         if self.is_in_session:
             return
-
-        self.screenshots = []
         self.is_in_session = True
 
         # This part handles displaying overlays on all screens
