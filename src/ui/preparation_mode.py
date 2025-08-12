@@ -57,7 +57,7 @@ class PreparationOverlayManager:
         for monitor in monitors:
             if self.active_monitor and monitor['id'] == self.active_monitor['id']:
                 # Active monitor gets the preparation indicator
-                self.indicator.show_initial_state(monitor)
+                self.indicator.show_preparation_mode(monitor, self.indicator_text)
             else:
                 # Inactive monitors get the dark, noisy overlay
                 self._create_inactive_overlay(monitor)
@@ -81,7 +81,7 @@ class PreparationOverlayManager:
             overlay_info['window'].destroy()
         self.overlays.clear()
 
-        self.indicator.hide()
+        self.indicator.hide_preparation_mode()
         # We don't deiconify the root window here, the calling module should do that.
 
     def _update_active_screen_focus(self):
@@ -107,7 +107,7 @@ class PreparationOverlayManager:
         old_monitor = self.active_monitor
 
         # Deactivate the old monitor: hide indicator and create inactive overlay
-        self.indicator.hide()
+        self.indicator.hide_preparation_mode()
         if old_monitor:
             self._create_inactive_overlay(old_monitor)
 
@@ -119,7 +119,7 @@ class PreparationOverlayManager:
             overlay_info['window'].destroy()
 
         self.active_monitor = new_monitor
-        self.indicator.show_initial_state(new_monitor)
+        self.indicator.show_preparation_mode(new_monitor, self.indicator_text)
 
 
     def _create_inactive_overlay(self, monitor):

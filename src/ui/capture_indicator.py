@@ -4,7 +4,7 @@ from tkinter import Toplevel
 COR_BOTAO = "#00995D"
 COR_BOTAO_HOVER = "#007a4a"
 
-class CaptureIndicator(tk.Toplevel):
+class CaptureIndicator(Toplevel):
     def __init__(self, parent, capture_module):
         super().__init__(parent)
         self.capture_module = capture_module
@@ -12,82 +12,66 @@ class CaptureIndicator(tk.Toplevel):
         self.wm_attributes("-topmost", True)
         self.configure(bg='#2b2b2b')
 
-        # --- Container Principal ---
         container = tk.Frame(self, bg=self.cget('bg'))
         container.pack(padx=10, pady=5)
 
-        # --- Widgets para TODOS os estados ---
-        # Serão mostrados ou escondidos conforme a necessidade
+        # --- Widgets Dinâmicos ---
+        # 1. Rótulo de instrução inicial (visível por padrão)
+        self.instruction_label = tk.Label(container, text="Pressione F9 para capturar a Tela Ativa", font=("Segoe UI", 10), fg="#cccccc", bg=self.cget('bg'))
+        self.instruction_label.pack(side="left", padx=(0, 15))
 
-        # Estado 1: Instrução Inicial
-        self.instruction_label = tk.Label(
-            container,
-            text="Pressione F9 para capturar a tela ativa",
-            font=("Segoe UI", 10),
-            fg="#cccccc",
-            bg=self.cget('bg')
-        )
+        # 2. Rótulo do contador (inicialmente oculto)
+        self.counter_label = tk.Label(container, font=("Segoe UI", 12, "bold"), fg="white", bg=self.cget('bg'))
 
-        # Estado 2: Sessão de Captura Ativa (agrupados em um frame)
-        self.session_frame = tk.Frame(container, bg=self.cget('bg'))
-        
-        self.counter_label = tk.Label(
-            self.session_frame,
-            text="Capturas: 0",
-            font=("Segoe UI", 12, "bold"),
-            fg="white",
-            bg=self.cget('bg')
-        )
-        self.counter_label.pack(side="left", padx=(0, 10))
+        # 3. Botão de encerrar (inicialmente oculto)
+        self.end_button = tk.Button(container, text="Encerrar", font=("Segoe UI", 9, "bold"), fg="white", bg=COR_BOTAO, relief="flat", command=self.capture_module.end_capture_session, bd=0, padx=10, pady=2)
+        self.end_button.bind("<Enter>", lambda e: e.widget.config(bg=COR_BOTAO_HOVER))
+        self.end_button.bind("<Leave>", lambda e: e.widget.config(bg=COR_BOTAO))
 
-        self.end_button = tk.Button(
-            self.session_frame,
-            text="CONCLUIR",
-            font=("Segoe UI", 9, "bold"),
-            fg="white",
-            bg="#c0392b",
-            relief="flat",
-            command=self.capture_module.end_capture_session,
-            bd=0,
-            padx=10,
-            pady=2
-        )
-        self.end_button.pack(side="left")
-
-        self.esc_label = tk.Label(
-            self.session_frame,
-            text="(ou ESC)",
-            font=("Segoe UI", 8),
-            fg="#cccccc",
-            bg=self.cget('bg')
-        )
-        self.esc_label.pack(side="left", padx=(5, 0))
-        
-        self.withdraw() # O indicador sempre começa escondido
-
-    def show_initial_state(self, monitor_info):
-        """Mostra o indicador no estado inicial de preparação."""
-        self.session_frame.pack_forget() # Garante que o frame da sessão esteja oculto
-        self.instruction_label.pack() # Mostra a instrução
-        self._position_and_show(monitor_info)
-
-    def update_session_view(self, count):
-        """Transforma ou atualiza o indicador para o modo de sessão."""
-        self.instruction_label.pack_forget() # Garante que a instrução esteja oculta
-        self.session_frame.pack() # Mostra o frame da sessão
-        self.counter_label.config(text=f"Capturas: {count}")
-
-    def hide(self):
-        """Esconde o indicador completamente."""
         self.withdraw()
 
-    def _position_and_show(self, monitor_info):
-        """Lógica interna para posicionar e exibir a janela."""
+    def update_session_view(self, count):
+        """Atualiza a UI do indicador com base no número de capturas."""
+        if count == 1:
+            # Primeira captura: transforma a UI
+            self.instruction_label.pack_forget()
+            self.counter_label.pack(side="left", padx=(0, 15))
+            self.end_button.pack(side="left")
+
+        # Atualiza o texto do contador em todas as chamadas
+        self.counter_label.config(text=f"Total de Capturas: {count}")
+
+
+    def show(self):
         self.update_idletasks()
         parent_width = self.master.winfo_screenwidth()
         width = self.winfo_reqwidth()
-        # Posiciona no canto superior direito do monitor ativo
+        x, y = parent_width - width - 20, 20
+        self.geometry(f"+{x}+{y}")
+        self.deiconify()
+
+    def hide(self):
+        self.withdraw()
+
+    def show_preparation_mode(self, monitor_info, text):
+        """Exibe o indicador em um modo de preparação na tela especificada."""
+        self.instruction_label.config(text=text) # Reutiliza o label de instrução para o modo de preparação
+        self.update_idletasks()
+
+        # Posiciona a janela no canto superior direito do monitor ativo
+        width = self.winfo_reqwidth()
         x = monitor_info['left'] + monitor_info['width'] - width - 20
         y = monitor_info['top'] + 20
         self.geometry(f"+{int(x)}+{int(y)}")
+
         self.deiconify()
+
+    def flash_success(self):
+        """Pisca a cor de fundo para verde para indicar sucesso."""
+        original_color = self.cget('bg')
+        self.configure(bg="#27ae60") # Verde sucesso
+        self.after(200, lambda: self.configure(bg=original_color))
+
+    def hide_preparation_mode(self):
+        """Esconde o indicador de preparação."""
+        self.withdraw()
