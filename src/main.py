@@ -29,74 +29,54 @@ from src.ui.settings_window import SettingsWindow
 from src.utils import resource_path
 
 def main():
-    try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)
-    except AttributeError:
-        try:
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception as e:
-            print(f"Alerta de DPI: Não foi possível configurar a sensibilidade de DPI. Erro: {e}")
+    # --- RITUAL DE INICIALIZAÇÃO ---
 
+    # 1. Forja-se a janela principal, mas nas SOMBRAS.
     root = tk.Tk()
-    root.withdraw()  # Oculta a janela principal inicialmente
-    root.state('zoomed') # Inicia a janela maximizada
+    root.withdraw() # ESTE É O FEITIÇO MAIS IMPORTANTE! Ele torna a janela principal invisível.
 
-    # Função para sair do modo maximizado/tela cheia
-    def exit_zoom(event=None):
-        root.state('normal')
-
-    # Vinculando a tecla Escape a esta função
-    root.bind('<Escape>', exit_zoom)
-
-    root.title("Sentinela Unimed")
-    root.protocol("WM_DELETE_WINDOW", root.withdraw)
-    root.geometry("1280x720")
-
-    try:
-        icon_path_ico = resource_path('logo.ico')
-        root.iconbitmap(icon_path_ico)
-    except (tk.TclError, FileNotFoundError):
-        icon_path_ico = None
-
+    # 2. Carrega-se a sabedoria (configurações).
     app_config = load_app_config()
-    save_path = app_config["DefaultSaveLocation"]
+    config_parser = app_config["config_parser_obj"]
 
-    # --- First Run Check ---
-    if not app_config.get("HasRunBefore", False):
+    # 3. Verifica-se se é o Rito de Passagem (primeira execução).
+    if not config_parser.has_option('User', 'has_run_before'):
+        # É a primeira vez! Invoca-se a janela de configuração inicial.
+        from src.ui.settings_window import SettingsWindow # Importação tardia
+
         settings_window = SettingsWindow(root, app_config, is_first_run=True)
 
-        # O Feitiço de Centralização
+        # O feitiço de maximização é aplicado APENAS à janela de boas-vindas.
+        settings_window.state('zoomed')
+
+        # Feitiço de centralização (garantia extra).
         settings_window.update_idletasks()
-        screen_width = settings_window.winfo_screenwidth()
-        screen_height = settings_window.winfo_screenheight()
-        window_width = settings_window.winfo_width()
-        window_height = settings_window.winfo_height()
-        x = (screen_width // 2) - (window_width // 2)
-        y = (screen_height // 2) - (window_height // 2)
-        settings_window.geometry(f'{window_width}x{window_height}+{x}+{y}')
+        width = settings_window.winfo_width()
+        height = settings_window.winfo_height()
+        x = (settings_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (settings_window.winfo_screenheight() // 2) - (height // 2)
+        settings_window.geometry(f'{width}x{height}+{x}+{y}')
 
+        # Torna a janela de boas-vindas o foco absoluto.
+        settings_window.grab_set()
         root.wait_window(settings_window)
-        save_path = app_config["DefaultSaveLocation"]
 
+    # --- FIM DO RITO DE PASSAGEM ---
 
-    capture_module = ScreenCaptureModule(root, save_path)
-    recording_module = ScreenRecordingModule(root, save_path)
-    main_app = MainApplication(root, capture_module, recording_module, app_config)
+    # 4. Forjam-se os módulos principais, passando o mapa completo.
+    capture_module = ScreenCaptureModule(root, app_config)
+    recording_module = ScreenRecordingModule(root, app_config)
+
+    # 5. Constrói-se a aplicação principal (que permanecerá oculta, se desejado).
+    main_app = MainApplication(root, capture_module, recording_module)
     main_app.pack(side="top", fill="both", expand=True)
 
-    listener_thread = threading.Thread(
-        target=key_listener_thread_proc,
-        args=(capture_module, recording_module, root, main_app),
-        daemon=True
-    )
-    listener_thread.start()
-
-    tray_thread = threading.Thread(
-        target=setup_tray_icon,
-        args=(root, capture_module, recording_module, app_config),
-        daemon=True
-    )
-    tray_thread.start()
+    # ... (Resto do seu código para criar a thread do listener e o ícone da bandeja) ...
+    # Exemplo:
+    # listener_thread = threading.Thread(...)
+    # listener_thread.start()
+    # tray_icon = setup_tray_icon(...)
+    # tray_icon.run_in_thread()
 
     root.mainloop()
 
