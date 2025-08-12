@@ -79,8 +79,8 @@ def main():
         save_path = app_config["DefaultSaveLocation"]
 
 
-    capture_module = ScreenCaptureModule(root, save_path)
-    recording_module = ScreenRecordingModule(root, save_path)
+    capture_module = ScreenCaptureModule(root, app_config)
+    recording_module = ScreenRecordingModule(root, app_config)
     main_app = MainApplication(root, capture_module, recording_module, app_config)
     main_app.pack(side="top", fill="both", expand=True)
 

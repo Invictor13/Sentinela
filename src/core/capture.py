@@ -13,6 +13,7 @@ class ScreenCaptureModule:
     def __init__(self, root, app_config):
         self.root = root
         self.app_config = app_config
+        self.default_save_path = self.app_config.get('Paths', 'DefaultSaveLocation')
         self.indicator = IndicatorWidget(self.root)
         self.is_in_session = False
         self.screenshots = []
