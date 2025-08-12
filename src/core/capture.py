@@ -157,8 +157,16 @@ class ScreenCaptureModule:
         # Show the main window again if it was hidden
         self.root.deiconify()
 
+        # O FEITIÇO DO ZERAMENTO VISUAL
+        # Garante que o placar da caçada seja limpo para o próximo herói.
+        if self.capture_indicator:
+            self.capture_indicator.reset_view()
+            self.capture_indicator.hide()
+
         # Proceed to save if screenshots were taken
         if not self.screenshots:
+            # Limpa a lista mesmo se não houver capturas, para garantir consistência
+            self.screenshots = []
             return
 
         try:
