@@ -1,48 +1,52 @@
 import os
-from datetime import datetime
-from tkinter import simpledialog, messagebox
-from PIL import Image
 import mss
+import tkinter as tk
+from PIL import Image
+from datetime import datetime
+from tkinter import simpledialog
+import re
 
-# Importações corrigidas para a nova estrutura unificada
-from ..ui.indicator_widget import IndicatorWidget
-from ..ui.dialogs import show_success_dialog, trigger_flash_animation
-from ..utils import is_valid_foldername, resource_path # Supondo que resource_path esteja em utils
+# Assuming these are the correct locations from the original file
+from src.ui.preparation_mode import PreparationOverlayManager
+from src.ui.dialogs import show_success_dialog
+from src.ui.capture_indicator import CaptureIndicator
+
+def is_valid_foldername(name):
+    """ Helper function to validate folder names. """
+    if not name: return False
+    # Windows reserved characters
+    if re.search(r'[<>:"/\\|?*]', name): return False
+    return True
 
 class ScreenCaptureModule:
-    def __init__(self, root, app_config):
+    def __init__(self, root, save_path):
         self.root = root
-        self.app_config = app_config
-        self.default_save_path = self.app_config.get('Paths', 'DefaultSaveLocation')
-        self.indicator = IndicatorWidget(self.root)
+        self.default_save_path = save_path
+        self.capture_indicator = CaptureIndicator(self.root, self)
         self.is_in_session = False
         self.screenshots = []
-        self.overlay_manager = None
+        self.overlay_manager = None # Supondo que o overlay é gerenciado aqui
 
     def start_capture_session(self):
-        """Inicia uma nova sessão de captura, limpando o estado e mostrando a UI de preparação."""
-        # Importação tardia para evitar ciclos de importação, uma boa prática.
-        from ..ui.preparation_mode import PreparationOverlayManager
+        """Inicia uma nova sessão de captura, limpando o estado e mostrando a UI."""
+        from ..ui.preparation_mode import PreparationOverlayManager # Importação tardia para evitar ciclos
         
         if self.is_in_session:
             return
 
         print("Iniciando sessão de captura...")
-        self.screenshots = []  # Garante que a lista de capturas comece limpa
+        self.screenshots = []
         self.is_in_session = True
         
-        # Cria e inicia o gerenciador de sobreposição, passando a si mesmo como módulo de controle
-        self.overlay_manager = PreparationOverlayManager(self.root, self.indicator, "Take Screenshot (F1)", "Recording will start on this screen.")
+        self.overlay_manager = PreparationOverlayManager(self.root, self.capture_indicator, "Pressione F9 para capturar a tela ativa")
         self.overlay_manager.start()
 
-    def take_screenshot(self):
-        """Tira um screenshot da tela ativa, adiciona à lista e comanda a atualização do indicador."""
+    def take_screenshot(self, active_monitor):
+        """Tira um screenshot da tela ativa e comanda a atualização do indicador."""
         if not self.is_in_session:
             return
 
-        active_monitor = self.overlay_manager.get_active_monitor()
         if not active_monitor:
-            print("Nenhum monitor ativo encontrado para captura.")
             return
 
         try:
@@ -54,43 +58,35 @@ class ScreenCaptureModule:
                 self.screenshots.append(img)
                 print(f"Captura #{len(self.screenshots)} realizada.")
                 
-                # Comanda o indicador para se transformar/atualizar para o estado de sessão
-                self.indicator.update_capture_session(len(self.screenshots), self)
+                # Comanda o indicador para se transformar/atualizar
+                self.capture_indicator.update_session_view(len(self.screenshots))
 
         except Exception as e:
             print(f"Erro de Captura: {e}")
 
     def end_capture_session(self):
-        """Finaliza a sessão de captura, salva os arquivos e limpa a UI."""
+        """Finaliza a sessão, salva os arquivos e limpa tudo."""
         if not self.is_in_session:
             return
             
         print("Encerrando sessão de captura...")
         self.is_in_session = False
         
-        # Destrói as sobreposições visuais
         if self.overlay_manager:
             self.overlay_manager.destroy()
             self.overlay_manager = None
 
-        # Procede com o salvamento apenas se houver capturas
         if self.screenshots:
-            folder_name_input = simpledialog.askstring(
-                "Salvar Evidências", 
-                "Digite o nome da pasta para as capturas:", 
-                parent=self.root
-            )
-            
-            config_parser = self.app_config["config_parser_obj"]
-            save_path = config_parser.get('Paths', 'DefaultSaveLocation')
+            folder_name_input = simpledialog.askstring("Salvar Evidências", "Digite o nome da pasta para as capturas:", parent=self.root)
             base_folder_name = folder_name_input if folder_name_input and is_valid_foldername(folder_name_input) else f"Evidencias_Captura_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
             
-            session_save_path = os.path.join(save_path, base_folder_name)
+            session_save_path = os.path.join(self.default_save_path, base_folder_name)
             os.makedirs(session_save_path, exist_ok=True)
             
             for i, img in enumerate(self.screenshots):
                 img.save(os.path.join(session_save_path, f"evidencia_{i+1}.png"))
             
+            # Supondo que show_success_dialog espera 4 argumentos
             show_success_dialog(
                 self.root,
                 f"{len(self.screenshots)} captura(s) salva(s) com sucesso!",
@@ -98,4 +94,4 @@ class ScreenCaptureModule:
                 session_save_path
             )
 
-        self.screenshots.clear() # Limpa a lista de screenshots para a próxima sessão
+        self.screenshots.clear()

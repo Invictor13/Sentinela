@@ -1,26 +1,12 @@
 import tkinter as tk
 from tkinter import Toplevel
-import mss
-from ..config.settings import COR_FUNDO_JANELA, COR_TEXTO_PRINCIPAL, COR_TEXTO_SECUNDARIO, COR_BOTAO
 
-def trigger_flash_animation(parent_window):
-    flash_window = Toplevel(parent_window)
-    flash_window.overrideredirect(True)
-    flash_window.attributes('-topmost', True)
-    try:
-        with mss.mss() as sct:
-            monitor_dims = sct.monitors[1]
-    except IndexError:
-        with mss.mss() as sct:
-            monitor_dims = sct.monitors[0]
-    flash_window.geometry(f"{monitor_dims['width']}x{monitor_dims['height']}+{monitor_dims['left']}+{monitor_dims['top']}")
-    flash_window.attributes('-alpha', 0.0)
-    flash_window.configure(bg='white')
-    flash_window.attributes('-alpha', 0.4)
-    flash_window.after(150, lambda: flash_window.destroy())
+COR_FUNDO_JANELA = "#f0f5f0"
+COR_TEXTO_PRINCIPAL = "#005a36"
+COR_TEXTO_SECUNDARIO = "#555555"
+COR_BOTAO = "#00995D"
 
 def show_success_dialog(root, message, folder_path, specific_path_to_copy):
-    # ... (o resto da sua função show_success_dialog continua aqui, sem alterações) ...
     dialog = Toplevel(root)
     dialog.title("Sucesso")
     dialog.configure(bg=COR_FUNDO_JANELA)
@@ -32,10 +18,10 @@ def show_success_dialog(root, message, folder_path, specific_path_to_copy):
     x = (screen_width // 2) - (dialog_width // 2)
     y = (screen_height // 2) - (dialog_height // 2)
     dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
-    
+
     tk.Label(dialog, text="Operação Concluída com Sucesso!", font=("Segoe UI", 12, "bold"), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_PRINCIPAL).pack(pady=(20, 10))
     tk.Label(dialog, text=f"A pasta de destino já foi aberta.\n{message}", font=("Segoe UI", 10), bg=COR_FUNDO_JANELA, fg=COR_TEXTO_SECUNDARIO, wraplength=430).pack()
-    
+
     button_frame = tk.Frame(dialog, bg=COR_FUNDO_JANELA)
     button_frame.pack(pady=20, expand=True)
 
@@ -50,5 +36,5 @@ def show_success_dialog(root, message, folder_path, specific_path_to_copy):
     close_button = tk.Button(button_frame, text="Concluir", command=dialog.destroy, font=("Segoe UI", 10), relief=tk.FLAT, padx=10, pady=5)
     close_button.pack(side="left", padx=5)
     close_button.focus_set()
-    
+
     dialog.after(7000, dialog.destroy)

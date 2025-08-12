@@ -1,197 +1,251 @@
 import os
-import threading
 import time
+import threading
 from datetime import datetime
 import cv2
 import mss
 import numpy as np
+from PIL import Image
+from pynput.mouse import Controller as MouseController
+import tkinter as tk
 from tkinter import messagebox
-from ..ui.dialogs import show_success_dialog
+import configparser
+from src.config.settings import CONFIG_FILE
+from src.utils import resource_path
 
-# NOTE: The problematic import 'from ..ui.indicator_widget import IndicatorWidget' is removed from here.
+from src.ui.preparation_indicator import PreparationIndicator
+from src.ui.dialogs import show_success_dialog
+from src.ui.preparation_mode import PreparationOverlayManager
+
 
 class ScreenRecordingModule:
-    def __init__(self, root, app_config):
+    def __init__(self, root, save_path):
         self.root = root
-        self.app_config = app_config
-
-        # LATE IMPORT: This is the fix.
-        # The import is moved here to break the circular dependency.
-        from ..ui.indicator_widget import IndicatorWidget
-        self.indicator = IndicatorWidget(self.root)
-
-        self.is_recording = False
-        self.state = "idle" # "idle", "preparing", "recording"
-        self.is_preparing = False
-        self.save_path = self.app_config.get('Paths', 'DefaultSaveLocation')
-
+        self.save_path = save_path
+        self.state = "idle"  # Can be "idle", "preparing", "recording"
         self.out = None
-        self.thread = None
-        self.target_monitor = None
-        self.record_all_screens = False
+        self.start_time = None
+        self.indicator = PreparationIndicator(self.root)
+        self.indicator.module_instance = self # For legacy `show` method
+        self.sct = mss.mss()
+        self.thread_gravacao = None
+        self.overlay_manager = None
+        self.should_record_all_screens = False
 
-    def enter_preparation_mode(self, record_all):
-        # This method is called from hotkeys and main_window
-        # Placeholder implementation
-        print(f"Entering preparation mode. Record all: {record_all}")
-        self.record_all_screens = record_all
-        self.state = "preparing"
-        self.is_preparing = True
-        # In a real scenario, this would likely involve showing a UI for area selection.
-        # For this reconstruction, we'll just change state. The user can then press the hotkey again.
-        print("Preparation mode active. Press record hotkey again to start.")
+    @property
+    def is_recording(self):
+        return self.state == "recording"
 
-    def start_recording_mode(self):
-        # This method is called from hotkeys
-        if self.is_recording:
-            return
-        print("Starting recording...")
-        self.is_recording = True
-        self.state = "recording"
-        self.is_preparing = False
-        self.thread = threading.Thread(target=self.recording_thread, daemon=True)
-        self.thread.start()
-
-    def stop_recording(self):
-        # This method is called from hotkeys
-        if not self.is_recording:
-            return
-        print("Stopping recording...")
-        self.is_recording = False
-        self.state = "idle"
-        # The thread will see the flag and stop itself.
+    @property
+    def is_preparing(self):
+        return self.state == "preparing"
 
     def exit_preparation_mode(self):
-        # This method is called from hotkeys
-        print("Exiting preparation mode.")
+        if self.state != "preparing":
+            return
+
+        if self.overlay_manager:
+            self.overlay_manager.destroy()
+            self.overlay_manager = None
+
         self.state = "idle"
-        self.is_preparing = False
+        # Ensure the main window is visible again
+        self.root.deiconify()
 
-    def open_recording_selection_ui(self):
-        # This method is called from the tray icon
-        # Placeholder implementation
-        print("Opening recording selection UI...")
-        # This would typically open a window or overlay.
-        # For now, we can just trigger the preparation mode.
-        self.enter_preparation_mode(record_all=False)
+    def enter_preparation_mode(self, record_all_screens=False):
+        print(f"[RUNA DE DEPURAÇÃO] Modo de Preparação iniciado com record_all_screens = {record_all_screens}")
+        self.should_record_all_screens = record_all_screens
+        if self.state != "idle":
+            return
 
-    # This is the method that was successfully read from the file.
-    def recording_thread(self):
-        """A thread que realiza a captura e escrita dos frames de vídeo, sem omissões."""
-        
-        # --- 1. PREPARAÇÃO DA ÁREA DE CAPTURA E DIMENSÕES ---
-        
-        capture_area = {}
-        width, height = 0, 0
+        if record_all_screens:
+            self.start_recording_mode()
+            return
 
-        with mss.mss() as sct:
-            if self.record_all_screens:
-                print("Modo Onipresente: Calculando dimensões de todas as telas.")
-                total_width = sum(m['width'] for m in sct.monitors[1:])
-                max_height = max(m['height'] for m in sct.monitors[1:])
-                width, height = total_width, max_height
-            else:
-                print("Modo Focado: Usando dimensões da tela única selecionada.")
-                # In a real app, target_monitor would be set during preparation_mode
-                if not self.target_monitor:
-                    self.target_monitor = sct.monitors[1] # Default to primary monitor
-                capture_area = self.target_monitor
-                width, height = capture_area['width'], capture_area['height']
+        self.state = "preparing"
+        # The overlay manager will hide the root window
+        self.overlay_manager = PreparationOverlayManager(
+            self.root,
+            self.indicator,
+            indicator_text="Mire na tela e pressione F10 para Iniciar/Parar",
+            inactive_text="Esta tela não será gravada."
+        )
+        self.overlay_manager.start()
 
-        # --- 2. CASCATA DE CONTINGÊNCIA DE CODECS ---
-        
-        config_parser = self.app_config["config_parser_obj"]
-        quality_profile = config_parser.get('Recording', 'quality', fallback='high')
-        
-        if quality_profile == 'high':
-            rec_fps = 15.0
-            rec_width, rec_height = width, height
-        else: # compact (web)
-            rec_fps = 10.0
-            aspect_ratio = width / height
-            rec_height = 720
-            rec_width = int(rec_height * aspect_ratio)
+    def start_recording_mode(self, quality_profile="high"):
+        active_monitor = None
+        if self.state == "preparing":
+            if not self.overlay_manager:
+                print("Error: In preparing state but no overlay manager found.")
+                self.state = "idle"
+                return
+            active_monitor = self.overlay_manager.get_active_monitor()
+            self.overlay_manager.destroy()
+            self.overlay_manager = None
+        elif self.state != "idle":
+            return
 
-        if rec_width % 2 != 0: rec_width -= 1
-        if rec_height % 2 != 0: rec_height -= 1
+        self.state = "recording"
+        self.root.withdraw()
+        time.sleep(0.2)
 
-        filename_base = f"Evidencia_Gravacao_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-        save_path_dir = self.app_config.get('Paths', 'DefaultSaveLocation')
-        self.out = None
-        final_video_path = ""
+        target_monitor = active_monitor if not self.should_record_all_screens else None
+        self.thread_gravacao = threading.Thread(target=self.recording_thread, args=(target_monitor, quality_profile), daemon=True)
+        self.thread_gravacao.start()
 
-        # NÍVEL 1: Tenta MP4/H.264
+        # The indicator needs to know which monitor to appear on.
+        indicator_monitor = active_monitor if active_monitor else self.sct.monitors[1]
+        self.indicator.show(indicator_monitor)
+        self.start_time = time.time()
+        self.update_chronometer_loop()
+
+    def stop_recording(self):
+        if self.state == "recording":
+            self.state = "idle"
+            self.indicator.hide()
+            self.root.deiconify()
+        elif self.state == "preparing":
+            self.state = "idle"
+            if self.overlay_manager:
+                self.overlay_manager.destroy()
+                self.overlay_manager = None
+            self.root.deiconify()
+
+    def recording_thread(self, target_to_record, quality_profile):
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+        quality_profile = config.get('Recording', 'quality', fallback='high')
+
+        filename = os.path.join(self.save_path, f"Evidencia_Gravacao_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.mp4")
+
         try:
-            path = os.path.join(save_path_dir, f"{filename_base}.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
-            self.out = cv2.VideoWriter(path, fourcc, rec_fps, (rec_width, rec_height))
-            if not self.out.isOpened(): raise IOError("MP4/avc1 falhou.")
-            final_video_path = path
-        except Exception:
-            self.out = None
+            cursor_img = Image.open(resource_path("cursor.png")).convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
+        except FileNotFoundError:
+            cursor_img = None
 
-        # NÍVEL 2: Tenta WebM/VP9
-        if self.out is None:
-            try:
-                path = os.path.join(save_path_dir, f"{filename_base}.webm")
-                fourcc = cv2.VideoWriter_fourcc(*'VP90')
-                self.out = cv2.VideoWriter(path, fourcc, rec_fps, (rec_width, rec_height))
-                if not self.out.isOpened(): raise IOError("WebM/VP9 falhou.")
-                final_video_path = path
-            except Exception:
-                self.out = None
+        mouse_controller = MouseController()
 
-        # NÍVEL 3: Tenta AVI/MJPG
-        if self.out is None:
+        if self.should_record_all_screens:
+            print("[RUNA DE DEPURAÇÃO] Forja ativada em modo Onipresente (todas as telas).")
+            monitors = self.sct.monitors[1:]
+            total_width = sum(m['width'] for m in monitors)
+            max_height = max(m['height'] for m in monitors)
+
+            if total_width % 2 != 0: total_width += 1
+            if max_height % 2 != 0: max_height += 1
+
+            width, height = total_width, max_height
+            recording_fps = 15.0
+        else:
+            if not target_to_record:
+                print("Error: Target monitor for recording is not set.")
+                self.root.after(0, self.stop_recording)
+                return
+
+            original_width, original_height = target_to_record['width'], target_to_record['height']
+            if quality_profile == "compact":
+                MAX_WIDTH, MAX_HEIGHT = 1280, 720
+                recording_fps = 10.0
+            else:
+                MAX_WIDTH, MAX_HEIGHT = 1920, 1080
+                recording_fps = 15.0
+
+            output_width, output_height = original_width, original_height
+            if original_width > MAX_WIDTH or original_height > MAX_HEIGHT:
+                aspect_ratio = original_width / original_height
+                if aspect_ratio > (MAX_WIDTH / MAX_HEIGHT):
+                    output_width = MAX_WIDTH
+                    output_height = int(output_width / aspect_ratio)
+                else:
+                    output_height = MAX_HEIGHT
+                    output_width = int(output_height * aspect_ratio)
+
+            if output_width % 2 != 0: output_width -= 1
+            if output_height % 2 != 0: output_height -= 1
+            width, height = output_width, output_height
+
+        codecs_to_try = ['X264', 'avc1', 'mp4v']
+        self.out = None
+        for codec in codecs_to_try:
+            fourcc = cv2.VideoWriter_fourcc(*codec)
             try:
-                path = os.path.join(save_path_dir, f"{filename_base}.avi")
-                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-                self.out = cv2.VideoWriter(path, fourcc, rec_fps, (rec_width, rec_height))
-                if not self.out.isOpened(): raise IOError("AVI/MJPG falhou.")
-                final_video_path = path
-            except Exception:
-                self.out = None
-        
+                self.out = cv2.VideoWriter(filename, fourcc, recording_fps, (width, height))
+                if self.out.isOpened(): break
+            except Exception: self.out = None
+
         if not self.out or not self.out.isOpened():
-            messagebox.showerror("Erro Crítico de Gravação", "Não foi possível iniciar nenhum codec de vídeo.")
+            messagebox.showerror("Erro Crítico", "Nenhum codec de vídeo funcional foi encontrado.")
             self.root.after(0, self.stop_recording)
             return
 
-        # --- 3. O LOOP PRINCIPAL DE GRAVAÇÃO ---
+        # ANTES do loop, garanta que o indicador esteja visível.
+        self.indicator.deiconify()
+
         with mss.mss() as sct:
             while self.is_recording:
                 loop_start_time = time.time()
                 try:
-                    if self.record_all_screens:
-                        monitor = sct.monitors[0]
-                        sct_img = sct.grab(monitor)
-                        frame_np = np.array(sct_img)
-                        final_frame = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
+                    if self.should_record_all_screens:
+                        monitors_to_capture = sct.monitors[1:]
+                        combined_frame = np.zeros((height, width, 3), dtype=np.uint8)
+                        current_x_offset = 0
+                        virtual_screen_left = sct.monitors[0]['left']
+                        virtual_screen_top = sct.monitors[0]['top']
+
+                        for monitor in monitors_to_capture:
+                            sct_img = sct.grab(monitor)
+                            frame_np = np.array(sct_img)
+                            h_m, w_m, _ = frame_np.shape
+                            frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
+                            combined_frame[0:h_m, current_x_offset:current_x_offset + w_m] = frame_bgr
+                            current_x_offset += w_m
+
+                        final_frame_pil = Image.fromarray(cv2.cvtColor(combined_frame, cv2.COLOR_BGR2RGB))
+                        if cursor_img:
+                            mouse_pos = mouse_controller.position
+                            cursor_x = mouse_pos[0] - virtual_screen_left
+                            cursor_y = mouse_pos[1] - virtual_screen_top
+                            final_frame_pil.paste(cursor_img, (cursor_x, cursor_y), cursor_img)
+                        self.out.write(cv2.cvtColor(np.array(final_frame_pil), cv2.COLOR_RGB2BGR))
                     else:
+                        capture_area = target_to_record
+
                         sct_img = sct.grab(capture_area)
+
                         frame_np = np.array(sct_img)
-                        final_frame = cv2.cvtColor(frame_np, cv2.COLOR_BGRA2BGR)
-
-                    if (final_frame.shape[1], final_frame.shape[0]) != (rec_width, rec_height):
-                        frame_to_write = cv2.resize(final_frame, (rec_width, rec_height), interpolation=cv2.INTER_AREA)
-                    else:
-                        frame_to_write = final_frame
-
-                    self.out.write(frame_to_write)
-
-                    elapsed_time = time.time() - loop_start_time
-                    sleep_time = (1.0 / rec_fps) - elapsed_time
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
+                        original_width, original_height = target_to_record['width'], target_to_record['height']
+                        if (original_width, original_height) != (width, height):
+                            frame_np_resized = cv2.resize(frame_np, (width, height), interpolation=cv2.INTER_AREA)
+                        else:
+                            frame_np_resized = frame_np
+                        frame_pil = Image.fromarray(cv2.cvtColor(frame_np_resized, cv2.COLOR_BGRA2RGB))
+                        if cursor_img:
+                            mouse_pos = mouse_controller.position
+                            cursor_x_in_capture = mouse_pos[0] - capture_area['left']
+                            cursor_y_in_capture = mouse_pos[1] - capture_area['top']
+                            scaled_cursor_x = int(cursor_x_in_capture * (width / original_width))
+                            scaled_cursor_y = int(cursor_y_in_capture * (height / original_height))
+                            frame_pil.paste(cursor_img, (scaled_cursor_x, scaled_cursor_y), cursor_img)
+                        self.out.write(cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR))
                 except Exception as e:
-                    print(f"Erro no loop de gravação: {e}")
-                    self.is_recording = False
+                    print(f"Erro durante o loop de gravação: {e}")
+                    if self.indicator:
+                        self.indicator.deiconify()
+                    self.state = "idle"
+                sleep_time = (1/recording_fps) - (time.time() - loop_start_time)
+                if sleep_time > 0: time.sleep(sleep_time)
 
-        # --- 4. FINALIZAÇÃO ---
-        if self.out:
-            self.out.release()
-        
-        if os.path.exists(final_video_path) and os.path.getsize(final_video_path) > 0:
-            self.root.after(0, lambda: show_success_dialog(self.root, "Gravação salva!", os.path.dirname(final_video_path), final_video_path))
-        
-        print("Thread de gravação finalizada.")
+        # DEPOIS do loop, esconda o indicador
+        self.indicator.hide()
+        if self.out: self.out.release()
+        def finalize_on_main_thread():
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                show_success_dialog(self.root, "Gravação salva.", os.path.dirname(filename), filename)
+            elif os.path.exists(filename):
+                os.remove(filename)
+        self.root.after(0, finalize_on_main_thread)
+
+    def update_chronometer_loop(self):
+        if self.is_recording and self.start_time is not None:
+            self.indicator.update_time(time.time() - self.start_time)
+            self.root.after(1000, self.update_chronometer_loop)
