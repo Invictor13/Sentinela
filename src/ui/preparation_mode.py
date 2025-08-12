@@ -57,7 +57,7 @@ class PreparationOverlayManager:
         for monitor in monitors:
             if self.active_monitor and monitor['id'] == self.active_monitor['id']:
                 # Active monitor gets the preparation indicator
-                self.indicator.show_initial_state(monitor)
+                self.indicator.show_preparation_mode(monitor, self.indicator_text)
             else:
                 # Inactive monitors get the dark, noisy overlay
                 self._create_inactive_overlay(monitor)
@@ -119,7 +119,7 @@ class PreparationOverlayManager:
             overlay_info['window'].destroy()
 
         self.active_monitor = new_monitor
-        self.indicator.show_initial_state(new_monitor)
+        self.indicator.show_preparation_mode(new_monitor, self.indicator_text)
 
 
     def _create_inactive_overlay(self, monitor):
