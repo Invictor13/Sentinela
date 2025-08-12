@@ -41,6 +41,13 @@ class CaptureIndicator(Toplevel):
         # Atualiza o texto do contador em todas as chamadas
         self.counter_label.config(text=f"Total de Capturas: {count}")
 
+    def reset_view(self):
+        """Redefine o indicador para o seu estado inicial."""
+        self.counter_label.pack_forget()
+        self.end_button.pack_forget()
+        self.instruction_label.pack(side="left", padx=(0, 15))
+        self.instruction_label.config(text="Pressione F9 para capturar a Tela Ativa")
+
 
     def show(self):
         self.update_idletasks()

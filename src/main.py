@@ -39,7 +39,7 @@ def main():
 
     root = tk.Tk()
     root.withdraw()  # Oculta a janela principal inicialmente
-    root.state('zoomed') # Inicia a janela maximizada
+    root.state('zoomed')  # Inicia a janela maximizada (comportamento estável)
 
     # Função para sair do modo maximizado/tela cheia
     def exit_zoom(event=None):
@@ -98,6 +98,7 @@ def main():
     )
     tray_thread.start()
 
+    root.deiconify()  # Re-exibe a janela principal antes do loop
     root.mainloop()
 
 if __name__ == "__main__":
