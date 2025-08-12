@@ -36,12 +36,10 @@ class ScreenCaptureModule:
 
     def start_capture_session(self):
         """ Starts the capture session, showing overlays and the initial command bar. """
-        # Garante que a lista comece limpa e o contador zere.
-        self.screenshots = []
-
         if self.is_in_session:
             return
 
+        self.screenshots = []
         self.is_in_session = True
 
         # This part handles displaying overlays on all screens
