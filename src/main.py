@@ -39,7 +39,8 @@ def main():
 
     root = tk.Tk()
     root.withdraw()  # Oculta a janela principal inicialmente
-    root.attributes('-fullscreen', True)  # Inicia em modo tela cheia real
+    root.state('zoomed')  # Inicia a janela maximizada (comportamento estável)
+
 
     # Função para sair do modo tela cheia
     def exit_fullscreen(event=None):
