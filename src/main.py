@@ -41,12 +41,14 @@ def main():
     root.withdraw()  # Oculta a janela principal inicialmente
     root.state('zoomed')  # Inicia a janela maximizada (comportamento estável)
 
-    # Função para sair do modo maximizado/tela cheia
-    def exit_zoom(event=None):
-        root.state('normal')
+
+    # Função para sair do modo tela cheia
+    def exit_fullscreen(event=None):
+        root.attributes('-fullscreen', False)
+        root.state('zoomed') # Opcional: maximizar após sair da tela cheia
 
     # Vinculando a tecla Escape a esta função
-    root.bind('<Escape>', exit_zoom)
+    root.bind('<Escape>', exit_fullscreen)
 
     root.title("Sentinela Unimed")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
