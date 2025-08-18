@@ -39,16 +39,8 @@ def main():
 
     root = tk.Tk()
     root.withdraw()  # Oculta a janela principal inicialmente
-    root.state('zoomed')  # Inicia a janela maximizada (comportamento estável)
 
-
-    # Função para sair do modo tela cheia
-    def exit_fullscreen(event=None):
-        root.attributes('-fullscreen', False)
-        root.state('zoomed') # Opcional: maximizar após sair da tela cheia
-
-    # Vinculando a tecla Escape a esta função
-    root.bind('<Escape>', exit_fullscreen)
+    # A lógica de tela cheia e a tecla Esc foram movidas para a classe MainApplication.
 
     root.title("Sentinela Unimed")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
@@ -81,10 +73,15 @@ def main():
         save_path = app_config["DefaultSaveLocation"]
 
 
+    # Configura o grid da janela raiz para que o frame principal possa se expandir
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+
     capture_module = ScreenCaptureModule(root, save_path)
     recording_module = ScreenRecordingModule(root, save_path)
     main_app = MainApplication(root, capture_module, recording_module, app_config)
-    main_app.pack(side="top", fill="both", expand=True)
+    # Posiciona o frame principal no grid para ocupar toda a janela
+    main_app.grid(row=0, column=0, sticky="nsew")
 
     listener_thread = threading.Thread(
         target=key_listener_thread_proc,
